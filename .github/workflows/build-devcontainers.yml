@@ -19,7 +19,7 @@ jobs:
         os: [ubuntu, fedora]
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate devcontainer with all packages
         run: |
