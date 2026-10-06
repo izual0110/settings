@@ -16,6 +16,10 @@ Creates `.devcontainer/Dockerfile` and `.devcontainer/devcontainer.json`. Then r
 
 Use `--help` for all options or `--force` to replace existing generated files.
 
+## CI
+
+GitHub Actions builds Docker images for Ubuntu `latest` and Fedora `latest` on pushes, pull requests, and manual runs. Both builds enable all optional packages, using Java LTS because the LTS and latest Java options are mutually exclusive. Images are built for validation only and are not published.
+
 ## Tests
 
 ```sh

@@ -1,0 +1,37 @@
+name: Build devcontainers
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }} latest with all packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, fedora]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Generate devcontainer with all packages
+        run: |
+          bash generate-devcontainer.sh \
+            --os "${{ matrix.os }}" \
+            --version latest \
+            --java-lts --clojure --php --go --claude --codex \
+            --docker --build-tools --jq --unzip \
+            --output .ci-devcontainer
+
+      - name: Build Docker image
+        run: |
+          docker build --pull --progress=plain \
+            --tag "devcontainer-ci:${{ matrix.os }}" \
+            .ci-devcontainer
