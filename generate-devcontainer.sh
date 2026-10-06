@@ -285,8 +285,8 @@ RUN curl -fsSL -o /tmp/codex-install.sh https://chatgpt.com/codex/install.sh \
     && codex --version
 EOF
         fi
-        printf '\nRUN git config --system --add safe.directory /workspace\n'
-        printf '\nWORKDIR /workspace\nCMD ["sleep", "infinity"]\n'
+        printf "\nRUN git config --system --add safe.directory '/workspaces/*'\n"
+        printf '\nWORKDIR /workspaces\nCMD ["sleep", "infinity"]\n'
     } > "$output/Dockerfile"
 
     {
@@ -294,8 +294,8 @@ EOF
 {
   "name": "Development container for ${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
-  "workspaceFolder": "/workspace",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
 EOF
         if [ "$docker" = true ]; then
             printf '  "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],\n'

@@ -93,15 +93,15 @@ class GenerateDevcontainerTests(unittest.TestCase):
             "Development container for ${localWorkspaceFolderBasename}",
         )
         self.assertEqual(config["build"], {"dockerfile": "Dockerfile"})
-        self.assertEqual(config["workspaceFolder"], "/workspace")
+        self.assertEqual(config["workspaceFolder"], "/workspaces/${localWorkspaceFolderBasename}")
         self.assertEqual(
             config["workspaceMount"],
-            "source=${localWorkspaceFolder},target=/workspace,type=bind",
+            "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
         )
         self.assertEqual(config["shutdownAction"], "stopContainer")
-        self.assertIn("WORKDIR /workspace\n", dockerfile)
+        self.assertIn("WORKDIR /workspaces\n", dockerfile)
         self.assertIn('CMD ["sleep", "infinity"]\n', dockerfile)
-        self.assertIn("git config --system --add safe.directory /workspace", dockerfile)
+        self.assertIn("git config --system --add safe.directory '/workspaces/*'", dockerfile)
         self.assertNotIn("safe.directory '*'", dockerfile)
         self.assertNotIn("privileged", config)
         # Check the generated RUN commands with the portable shell parser too.
@@ -553,7 +553,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
         (output / "keep.txt").write_text("untouched")
         self.assert_success(self.run_generator("--output", str(output), "--force", "--java"))
         self.assert_java((output / "Dockerfile").read_text(), "25")
-        self.assertEqual(json.loads((output / "devcontainer.json").read_text())["workspaceFolder"], "/workspace")
+        self.assertEqual(
+            json.loads((output / "devcontainer.json").read_text())["workspaceFolder"],
+            "/workspaces/${localWorkspaceFolderBasename}",
+        )
         self.assertEqual((output / "keep.txt").read_text(), "untouched")
         self.assertEqual({p.name for p in output.iterdir()}, {"Dockerfile", "devcontainer.json", "keep.txt"})
 
