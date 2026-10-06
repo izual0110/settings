@@ -30,8 +30,16 @@ jobs:
             --docker --build-tools --jq --unzip \
             --output .ci-devcontainer
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build Docker image
-        run: |
-          docker build --pull --progress=plain \
-            --tag "devcontainer-ci:${{ matrix.os }}" \
-            .ci-devcontainer
+        uses: docker/build-push-action@v7
+        with:
+          context: .ci-devcontainer
+          tags: devcontainer-ci:${{ matrix.os }}
+          pull: true
+          load: true
+          push: false
+          cache-from: type=gha,version=2,scope=devcontainer-${{ matrix.os }}
+          cache-to: type=gha,version=2,scope=devcontainer-${{ matrix.os }},mode=max
