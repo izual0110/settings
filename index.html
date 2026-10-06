@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Генератор devcontainer: Ubuntu или Fedora, Java, Clojure, PHP, Go и инструменты разработки. Два файла одной Bash-командой.">
+    <meta name="description" content="Devcontainer builder: Ubuntu or Fedora, Java, Clojure, PHP, Go, and development tools. Two files with one Bash command.">
     <title>Devcontainer builder</title>
     <link rel="stylesheet" href="devcontainer.css">
     <script src="devcontainer.js" defer></script>
@@ -12,48 +12,48 @@
     <div class="page">
       <header class="topbar">
         <a class="brand" href="./"><span class="brand-icon" aria-hidden="true">[·]</span> settings <span class="brand-divider">/</span> devcontainer</a>
-        <a class="source-link" href="https://github.com/izual0110/settings">Исходный код ↗</a>
+        <a class="source-link" href="https://github.com/izual0110/settings">Source code ↗</a>
       </header>
 
       <main>
         <div class="intro">
           <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> YOUR STACK. YOUR CONTAINER.</p>
-          <h1>Среда разработки.<br><span>Одной командой.</span></h1>
-          <p class="intro-text">Выберите Linux, языки и инструменты. Скопируйте команду в терминал проекта — Bash соберёт вашу <code>.devcontainer</code>.</p>
+          <h1>Your dev environment.<br><span>One command.</span></h1>
+          <p class="intro-text">Choose your Linux distribution, languages, and tools. Paste the command into your project's terminal — Bash will generate your <code>.devcontainer</code>.</p>
         </div>
 
-        <noscript><p class="notice">Для интерактивного выбора нужен JavaScript. Можно <a href="generate-devcontainer.sh">скачать скрипт</a> и запустить <code>bash generate-devcontainer.sh --help</code>.</p></noscript>
+        <noscript><p class="notice">JavaScript is required for interactive configuration. You can <a href="generate-devcontainer.sh">download the script</a> and run <code>bash generate-devcontainer.sh --help</code>.</p></noscript>
 
         <div class="builder">
           <form id="configuration" class="configuration">
             <section class="panel">
               <fieldset>
-                <legend><span class="step">01</span> Операционная система</legend>
-                <p class="section-note">Один контейнер — один Linux.</p>
+                <legend><span class="step">01</span> Operating system</legend>
+                <p class="section-note">One container — one Linux distribution.</p>
                 <div class="os-grid">
                   <label class="choice os-choice">
                     <input type="radio" name="os" value="ubuntu" checked>
                     <span class="os-icon ubuntu-icon" aria-hidden="true">U</span>
-                    <span><strong>Ubuntu</strong><small>Стабильная база · apt</small></span>
+                    <span><strong>Ubuntu</strong><small>Stable foundation · apt</small></span>
                   </label>
                   <label class="choice os-choice">
                     <input type="radio" name="os" value="fedora">
                     <span class="os-icon fedora-icon" aria-hidden="true">f</span>
-                    <span><strong>Fedora</strong><small>Свежие пакеты · dnf</small></span>
+                    <span><strong>Fedora</strong><small>Up-to-date packages · dnf</small></span>
                   </label>
                 </div>
               </fieldset>
               <fieldset class="versions-fieldset">
-                <legend class="sublegend">Версия образа</legend>
+                <legend class="sublegend">Image version</legend>
                 <div id="versions" class="versions"></div>
-                <p class="section-note">Релизы фиксируются в генераторе. <code>latest</code> — плавающий тег издателя образа, он может меняться между сборками.</p>
+                <p class="section-note">Releases are pinned in the generator. <code>latest</code> is a floating tag maintained by the image publisher and may change between builds.</p>
               </fieldset>
             </section>
 
             <section class="panel">
               <fieldset>
-                <legend><span class="step">02</span> Языки</legend>
-                <p class="section-note">Можно выбрать несколько — или оставить только Linux.</p>
+                <legend><span class="step">02</span> Languages</legend>
+                <p class="section-note">Choose multiple languages — or stick with just Linux.</p>
                 <div class="language-grid">
                   <div>
                     <label class="choice language-choice">
@@ -62,7 +62,7 @@
                       <span><strong>Java</strong><small>Eclipse Temurin · JDK</small></span>
                     </label>
                     <fieldset id="java-versions" class="versions-fieldset">
-                      <legend class="sublegend">Версия Java</legend>
+                      <legend class="sublegend">Java version</legend>
                       <div class="versions">
                         <label class="choice version-choice"><input type="radio" name="java-version" value="java-lts" checked><span>25 LTS</span></label>
                         <label class="choice version-choice"><input type="radio" name="java-version" value="java-latest"><span>27 latest</span></label>
@@ -85,60 +85,60 @@
                     <span><strong>Golang</strong><small>Go toolchain</small></span>
                   </label>
                 </div>
-                <p class="section-note footnote">Java: 25 LTS или 27 из образов Eclipse Temurin (Docker Hub). Clojure CLI 1.12.6.1673: официальный установщик из GitHub, rlwrap и выбранная Java (по умолчанию 25 LTS). PHP и Go — из репозиториев Linux. Сеть нужна при сборке контейнера; SDK на хост не устанавливаются.</p>
+                <p class="section-note footnote">Java: 25 LTS or 27 from Eclipse Temurin images (Docker Hub). Clojure CLI 1.12.6.1673: the official installer from GitHub, rlwrap, and your selected Java version (25 LTS by default). PHP and Go come from Linux repositories. Network access is required when building the container; no SDKs are installed on the host.</p>
               </fieldset>
             </section>
 
             <section class="panel">
               <fieldset>
-                <legend><span class="step">03</span> Инструменты</legend>
-                <p class="section-note">Bash, Git, curl, CA-сертификаты, tar, gzip, find и ps уже включены.</p>
+                <legend><span class="step">03</span> Tools</legend>
+                <p class="section-note">Bash, Git, curl, CA certificates, tar, gzip, find, and ps are already included.</p>
                 <div class="tools-grid">
                   <label class="choice tool-choice"><input type="checkbox" data-flag="build-tools"><span><strong>Build tools</strong><small>C / C++ · make</small></span></label>
-                  <label class="choice tool-choice"><input type="checkbox" data-flag="jq"><span><strong>jq</strong><small>Работа с JSON</small></span></label>
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="jq"><span><strong>jq</strong><small>JSON processing</small></span></label>
 
-                  <label class="choice tool-choice"><input type="checkbox" data-flag="unzip"><span><strong>unzip</strong><small>ZIP-архивы</small></span></label>
-                  <label class="choice tool-choice"><input id="docker" type="checkbox" data-flag="docker" aria-describedby="docker-note"><span><strong>Docker + Compose</strong><small>Docker хоста из контейнера</small></span></label>
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="unzip"><span><strong>unzip</strong><small>ZIP archives</small></span></label>
+                  <label class="choice tool-choice"><input id="docker" type="checkbox" data-flag="docker" aria-describedby="docker-note"><span><strong>Docker + Compose</strong><small>Host Docker from the container</small></span></label>
                   <label class="choice tool-choice"><input type="checkbox" data-flag="claude" aria-describedby="ai-note"><span><strong>Claude Code</strong><small>CLI · Anthropic</small></span></label>
                   <label class="choice tool-choice"><input type="checkbox" data-flag="codex" aria-describedby="ai-note"><span><strong>Codex</strong><small>CLI · OpenAI</small></span></label>
                 </div>
-                <p id="ai-note" class="section-note footnote">Claude Code и Codex устанавливаются только в контейнер. После запуска нужна авторизация; использование сервисов зависит от тарифа. Ключи и настройки хоста не копируются.</p>
-                <p id="docker-note" class="section-note footnote">Docker подключает <code>/var/run/docker.sock</code>. Доступ к сокету даёт контейнеру управление Docker-демоном хоста; включайте только для доверенных проектов.</p>
-                <p id="docker-warning" class="notice warning" hidden>Docker-сокет будет смонтирован в контейнер. На Linux это может дать доступ с правами root к хосту. Для Ubuntu 22.04 возможен fallback на Compose v1.</p>
+                <p id="ai-note" class="section-note footnote">Claude Code and Codex are installed only inside the container. Authentication is required after startup; service usage depends on your plan. Host keys and settings are not copied.</p>
+                <p id="docker-note" class="section-note footnote">Docker mounts <code>/var/run/docker.sock</code>. Socket access lets the container control the host's Docker daemon; enable it only for trusted projects.</p>
+                <p id="docker-warning" class="notice warning" hidden>The Docker socket will be mounted inside the container. On Linux, this may grant root-level access to the host. Ubuntu 22.04 may fall back to Compose v1.</p>
               </fieldset>
             </section>
-            <button id="reset" class="text-button" type="button">Сбросить выбор ↺</button>
+            <button id="reset" class="text-button" type="button">Reset selection ↺</button>
           </form>
 
           <aside class="result" aria-labelledby="result-title">
             <div class="result-panel">
-              <div class="result-header"><span class="eyebrow">READY TO BUILD</span><span class="file-count">2 файла</span></div>
-              <h2 id="result-title">Ваш devcontainer</h2>
+              <div class="result-header"><span class="eyebrow">READY TO BUILD</span><span class="file-count">2 files</span></div>
+              <h2 id="result-title">Your devcontainer</h2>
               <p id="summary" class="result-summary" aria-live="polite">Ubuntu · Java 25 LTS</p>
               <div class="image-line"><span class="status-dot" aria-hidden="true"></span><code id="image">ubuntu:26.04</code></div>
               <div class="terminal">
-                <div class="terminal-header"><span aria-hidden="true">● ● ●</span><span>терминал · корень проекта</span></div>
-                <label class="sr-only" for="command">Команда генерации devcontainer</label>
+                <div class="terminal-header"><span aria-hidden="true">● ● ●</span><span>terminal · project root</span></div>
+                <label class="sr-only" for="command">Devcontainer generation command</label>
                 <textarea id="command" readonly spellcheck="false" rows="5" wrap="soft"></textarea>
               </div>
-              <button id="copy" class="copy-button" type="button" disabled>Скопировать команду <span aria-hidden="true">↗</span></button>
+              <button id="copy" class="copy-button" type="button" disabled>Copy command <span aria-hidden="true">↗</span></button>
               <p id="copy-status" class="copy-status" role="status"></p>
-              <label class="force-option"><input id="force" type="checkbox" form="configuration" data-flag="force"><span>Перезаписать существующие файлы <code>--force</code></span></label>
-              <p class="section-note">По умолчанию существующие файлы не меняются. Скрипт только генерирует конфигурацию, не запускает Docker и не требует <code>sudo</code>.</p>
-              <div class="file-tree" aria-label="Создаваемые файлы"><code>.devcontainer/<br>├── Dockerfile<br>└── devcontainer.json</code></div>
+              <label class="force-option"><input id="force" type="checkbox" form="configuration" data-flag="force"><span>Overwrite existing files <code>--force</code></span></label>
+              <p class="section-note">Existing files are left unchanged by default. The script only generates configuration; it does not start Docker or require <code>sudo</code>.</p>
+              <div class="file-tree" aria-label="Generated files"><code>.devcontainer/<br>├── Dockerfile<br>└── devcontainer.json</code></div>
               <ol class="instructions">
-                <li>Запустите команду в папке проекта.</li>
-                <li>Откройте проект через Dev Containers в редакторе.</li>
-                <li>Редактор соберёт образ и запустит контейнер.</li>
+                <li>Run the command in your project folder.</li>
+                <li>Open the project using Dev Containers in your editor.</li>
+                <li>Your editor will build the image and start the container.</li>
               </ol>
-              <a class="script-link" href="generate-devcontainer.sh">Посмотреть Bash-скрипт перед запуском ↗</a>
-              <p class="section-note publish-note">Команда скачивает скрипт из ветки <code>master</code> репозитория <code>izual0110/settings</code>. Новые изменения доступны по ссылке после публикации в GitHub.</p>
+              <a class="script-link" href="generate-devcontainer.sh">Review the Bash script before running it ↗</a>
+              <p class="section-note publish-note">The command downloads the script from the <code>master</code> branch of the <code>izual0110/settings</code> repository. New changes become available at this URL after they are published to GitHub.</p>
             </div>
           </aside>
         </div>
       </main>
 
-      <footer><span>Без бэкенда. Без зависимостей. Только ваши настройки.</span></footer>
+      <footer><span>No backend. No dependencies. Just your settings.</span></footer>
     </div>
   </body>
 </html>

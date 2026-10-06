@@ -8,11 +8,11 @@ const DISTRIBUTIONS = {
     image: "ubuntu",
     defaultVersion: "lts",
     versions: [
-      { value: "lts", label: "26.04 LTS", note: "рекомендуется", tag: "26.04" },
+      { value: "lts", label: "26.04 LTS", note: "recommended", tag: "26.04" },
       { value: "24.04", label: "24.04 LTS", tag: "24.04" },
       { value: "22.04", label: "22.04 LTS", tag: "22.04" },
-      { value: "current", label: "Последняя", note: "26.04", tag: "26.04" },
-      { value: "latest", label: "latest", note: "плавающий тег", tag: "latest" },
+      { value: "current", label: "Latest release", note: "26.04", tag: "26.04" },
+      { value: "latest", label: "latest", note: "floating tag", tag: "latest" },
     ],
   },
   fedora: {
@@ -20,8 +20,8 @@ const DISTRIBUTIONS = {
     image: "quay.io/fedora/fedora",
     defaultVersion: "current",
     versions: [
-      { value: "current", label: "Последняя", note: "44", tag: "44" },
-      { value: "latest", label: "latest", note: "плавающий тег", tag: "latest" },
+      { value: "current", label: "Latest release", note: "44", tag: "44" },
+      { value: "latest", label: "latest", note: "floating tag", tag: "latest" },
     ],
   },
 };
@@ -31,17 +31,17 @@ const FLAG_LABELS = {
   clojure: "Clojure CLI 1.12.6.1673", php: "PHP", go: "Go", "build-tools": "Build tools",
   jq: "jq", unzip: "unzip", docker: "Docker + Compose",
   claude: "Claude Code", codex: "Codex",
-  force: "перезапись файлов",
+  force: "overwrite files",
 };
 
 function buildCommand(os, version, flags) {
   if (!Object.hasOwnProperty.call(DISTRIBUTIONS, os) ||
       !DISTRIBUTIONS[os].versions.some((release) => release.value === version) ||
       flags.some((flag) => !Object.hasOwnProperty.call(FLAG_LABELS, flag))) {
-    throw new Error("Неизвестная опция генератора");
+    throw new Error("Unknown generator option");
   }
   if (flags.filter((flag) => ["java", "java-lts", "java-latest"].includes(flag)).length > 1) {
-    throw new Error("Опции --java, --java-lts и --java-latest взаимоисключающие");
+    throw new Error("The --java, --java-lts, and --java-latest options are mutually exclusive");
   }
   const args = ["--os", os, "--version", version, ...flags.map((flag) => `--${flag}`)];
   return `curl -fsSL '${SCRIPT_URL}' | bash -s -- ${args.join(" ")}`;
@@ -120,11 +120,11 @@ copyButton.addEventListener("click", async () => {
   const value = command.value;
   try {
     await navigator.clipboard.writeText(value);
-    copyStatus.textContent = command.value === value ? "Команда скопирована. Запустите её в папке проекта." : "Скопирован предыдущий выбор. Скопируйте новую команду.";
+    copyStatus.textContent = command.value === value ? "Command copied. Run it in your project folder." : "Previous selection copied. Copy the new command.";
   } catch {
     command.focus();
     command.select();
-    copyStatus.textContent = "Автокопирование недоступно. Команда выделена — нажмите Ctrl+C или ⌘C.";
+    copyStatus.textContent = "Automatic copying is unavailable. The command is selected — press Ctrl+C or ⌘C.";
   }
 });
 
