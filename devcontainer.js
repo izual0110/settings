@@ -24,10 +24,20 @@ const DISTRIBUTIONS = {
       { value: "latest", label: "latest", note: "floating tag", tag: "latest" },
     ],
   },
+  alpine: {
+    name: "Alpine",
+    image: "alpine",
+    defaultVersion: "current",
+    versions: [
+      { value: "current", label: "Latest release", note: "3.24", tag: "3.24" },
+      { value: "latest", label: "latest", note: "floating tag", tag: "latest" },
+    ],
+  },
 };
 
 const FLAG_LABELS = {
   java: "Java 25 LTS", "java-lts": "Java 25 LTS", "java-latest": "Java 27 (latest)",
+  maven: "Maven", gradle: "Gradle",
   clojure: "Clojure CLI 1.12.6.1673", php: "PHP", go: "Go", "build-tools": "Build tools",
   jq: "jq", unzip: "unzip", docker: "Docker + Compose",
   claude: "Claude Code", codex: "Codex",
@@ -87,9 +97,12 @@ function updateCommand() {
   const javaVersions = document.getElementById("java-versions");
   javaVersions.hidden = !javaEnabled;
   javaVersions.disabled = !javaEnabled;
+  const javaTools = document.getElementById("java-tools");
+  javaTools.hidden = !javaEnabled;
+  javaTools.disabled = !javaEnabled;
   // form.elements also includes the --force checkbox outside the form.
   const flags = Array.from(form.elements)
-    .filter((input) => input.checked && input.dataset.flag && input.dataset.flag !== "java")
+    .filter((input) => input.checked && !input.matches(":disabled") && input.dataset.flag && input.dataset.flag !== "java")
     .map((input) => input.dataset.flag);
   if (javaEnabled) {
     flags.unshift(form.querySelector('input[name="java-version"]:checked').value);
