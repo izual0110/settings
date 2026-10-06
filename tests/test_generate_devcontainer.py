@@ -73,6 +73,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
         )
         dockerfile = (directory / "Dockerfile").read_text()
         config = json.loads((directory / "devcontainer.json").read_text())
+        self.assertEqual(
+            config["name"],
+            "Development container for ${localWorkspaceFolderBasename}",
+        )
         self.assertEqual(config["build"], {"dockerfile": "Dockerfile"})
         self.assertEqual(config["workspaceFolder"], "/workspace")
         self.assertEqual(

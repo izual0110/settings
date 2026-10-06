@@ -239,7 +239,7 @@ EOF
     {
         cat <<'EOF'
 {
-  "name": "Development container",
+  "name": "Development container for ${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
