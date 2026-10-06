@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Devcontainer builder: Ubuntu or Fedora, Java, Clojure, PHP, Go, and development tools. Two files with one Bash command.">
+    <meta name="description" content="Devcontainer builder: Ubuntu, Fedora or Alpine, Java, Clojure, PHP, Go, and development tools. Two files with one Bash command.">
     <title>Devcontainer builder</title>
     <link rel="stylesheet" href="devcontainer.css">
     <script src="devcontainer.js" defer></script>
@@ -41,6 +41,11 @@
                     <span class="os-icon fedora-icon" aria-hidden="true">f</span>
                     <span><strong>Fedora</strong><small>Up-to-date packages · dnf</small></span>
                   </label>
+                  <label class="choice os-choice">
+                    <input type="radio" name="os" value="alpine">
+                    <span class="os-icon alpine-icon" aria-hidden="true">A</span>
+                    <span><strong>Alpine</strong><small>Lightweight · musl · apk</small></span>
+                  </label>
                 </div>
               </fieldset>
               <fieldset class="versions-fieldset">
@@ -68,6 +73,13 @@
                         <label class="choice version-choice"><input type="radio" name="java-version" value="java-latest"><span>27 latest</span></label>
                       </div>
                     </fieldset>
+                    <fieldset id="java-tools" class="versions-fieldset">
+                      <legend class="sublegend">Java build tools</legend>
+                      <div class="versions">
+                        <label class="choice version-choice"><input type="checkbox" data-flag="maven"><span>Maven (mvn)</span></label>
+                        <label class="choice version-choice"><input type="checkbox" data-flag="gradle"><span>Gradle</span></label>
+                      </div>
+                    </fieldset>
                   </div>
                   <label class="choice language-choice">
                     <input id="clojure" type="checkbox" data-flag="clojure">
@@ -85,7 +97,7 @@
                     <span><strong>Golang</strong><small>Go toolchain</small></span>
                   </label>
                 </div>
-                <p class="section-note footnote">Java: 25 LTS or 27 from Eclipse Temurin images (Docker Hub). Clojure CLI 1.12.6.1673: the official installer from GitHub, rlwrap, and your selected Java version (25 LTS by default). PHP and Go come from Linux repositories. Network access is required when building the container; no SDKs are installed on the host.</p>
+                <p class="section-note footnote">Java: 25 LTS or 27 from Eclipse Temurin images (Docker Hub), using musl-compatible images on Alpine. Optional Maven and Gradle use your selected JDK. Clojure CLI 1.12.6.1673: the official installer from GitHub, rlwrap, and your selected Java version (25 LTS by default). PHP and Go come from Linux repositories. Network access is required when building the container; no SDKs are installed on the host.</p>
               </fieldset>
             </section>
 

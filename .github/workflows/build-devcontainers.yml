@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, fedora]
+        os: [ubuntu, fedora, alpine]
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -26,7 +26,7 @@ jobs:
           bash generate-devcontainer.sh \
             --os "${{ matrix.os }}" \
             --version latest \
-            --java-lts --clojure --php --go --claude --codex \
+            --java-lts --maven --gradle --clojure --php --go --claude --codex \
             --docker --build-tools --jq --unzip \
             --output .ci-devcontainer
 

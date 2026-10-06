@@ -22,14 +22,29 @@ RELEASES = {
         "26.04": "26.04",
     },
     "fedora": {"current": "44", "latest": "latest", "44": "44"},
+    "alpine": {"current": "3.24", "latest": "latest", "3.24": "3.24"},
 }
 LANGUAGES = {
     "ubuntu": {"php": "php-cli", "go": "golang-go"},
     "fedora": {"php": "php-cli", "go": "golang"},
+    "alpine": {"php": "php-cli", "go": "go"},
 }
 JAVA_PACKAGES = {
     "ubuntu": {"fontconfig", "libstdc++6", "tzdata", "zlib1g", "binutils"},
     "fedora": {"fontconfig", "libstdc++", "tzdata", "zlib", "binutils"},
+    "alpine": {"fontconfig", "ttf-dejavu", "libgcc", "libstdc++", "tzdata", "zlib", "binutils"},
+}
+DEFAULT_TAGS = {"ubuntu": "26.04", "fedora": "44", "alpine": "3.24"}
+AWK_PACKAGES = {"ubuntu": "mawk", "fedora": "gawk", "alpine": "gawk"}
+DOCKER_PACKAGES = {
+    "ubuntu": {"docker.io", "docker-compose-v2"},
+    "fedora": {"docker-cli", "docker-compose"},
+    "alpine": {"docker-cli", "docker-cli-compose"},
+}
+BUILD_PACKAGES = {
+    "ubuntu": {"build-essential"},
+    "fedora": {"gcc", "gcc-c++", "make"},
+    "alpine": {"build-base"},
 }
 EXTRAS = ("docker", "build-tools", "jq", "unzip")
 
@@ -106,26 +121,36 @@ class GenerateDevcontainerTests(unittest.TestCase):
 
     @staticmethod
     def installed_packages(dockerfile):
-        line = next(line for line in dockerfile.splitlines() if "install -y " in line)
-        words = shlex.split(line.split("install -y ", 1)[1].rstrip().rstrip("\\"))
+        marker = "apk add --no-cache " if dockerfile.startswith("FROM alpine:") else "install -y "
+        line = next(line for line in dockerfile.splitlines() if marker in line)
+        words = shlex.split(line.split(marker, 1)[1].rstrip().rstrip("\\"))
         return set(words) - {"--no-install-recommends", "$compose_package"}
 
     def assert_base(self, dockerfile, os_name, tag):
-        image = "ubuntu" if os_name == "ubuntu" else "quay.io/fedora/fedora"
+        image = {"ubuntu": "ubuntu", "fedora": "quay.io/fedora/fedora", "alpine": "alpine"}[os_name]
         self.assertTrue(dockerfile.startswith(f"FROM {image}:{tag}\n"))
         packages = self.installed_packages(dockerfile)
         base = {"bash", "ca-certificates", "curl", "git", "tar", "gzip", "findutils"}
         base.add("procps" if os_name == "ubuntu" else "procps-ng")
+        if os_name == "alpine":
+            base.add("coreutils")
         self.assertTrue(base <= packages, packages)
         if os_name == "ubuntu":
             self.assertIn("apt-get update", dockerfile)
             self.assertIn("DEBIAN_FRONTEND=noninteractive", dockerfile)
             self.assertIn("rm -rf /var/lib/apt/lists/*", dockerfile)
             self.assertNotIn("dnf", dockerfile)
-        else:
+        elif os_name == "fedora":
             self.assertIn("dnf install -y", dockerfile)
             self.assertIn("dnf clean all", dockerfile)
             self.assertNotIn("apt-get", dockerfile)
+        else:
+            self.assertIn("RUN apk add --no-cache ", dockerfile)
+            self.assertNotIn("apt-get", dockerfile)
+            self.assertNotIn("dnf", dockerfile)
+            self.assertNotIn("apk update", dockerfile)
+            self.assertNotIn("gcompat", packages)
+            self.assertNotIn("libc6-compat", packages)
         return base
 
     def test_defaults(self):
@@ -140,6 +165,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
         cases = [
             (["--os", "ubuntu"], "ubuntu", "26.04"),
             (["--os", "fedora"], "fedora", "44"),
+            (["--os", "alpine"], "alpine", "3.24"),
+            (["--version", "current", "--os", "alpine"], "alpine", "3.24"),
+            (["--version", "latest", "--os", "alpine"], "alpine", "latest"),
+            (["--version", "3.24", "--os", "alpine"], "alpine", "3.24"),
             (["--version", "current", "--os", "fedora"], "fedora", "44"),
             (["--version", "latest", "--os", "ubuntu"], "ubuntu", "latest"),
         ]
@@ -152,9 +181,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
                 self.assertEqual(self.installed_packages(dockerfile), base)
                 self.assertNotIn("mounts", config)
 
-    def assert_java(self, dockerfile, version):
+    def assert_java(self, dockerfile, version, os_name="ubuntu"):
+        suffix = "-alpine" if os_name == "alpine" else ""
         self.assertIn(
-            f"COPY --from=eclipse-temurin:{version}-jdk /opt/java/openjdk /opt/java/openjdk",
+            f"COPY --from=eclipse-temurin:{version}-jdk{suffix} /opt/java/openjdk /opt/java/openjdk",
             dockerfile,
         )
         self.assertEqual(dockerfile.count("COPY --from=eclipse-temurin:"), 1)
@@ -162,8 +192,35 @@ class GenerateDevcontainerTests(unittest.TestCase):
         self.assertIn('ENV PATH="${JAVA_HOME}/bin:${PATH}"', dockerfile)
         self.assertIn("RUN java --version && javac --version", dockerfile)
 
+    def assert_java_build_tools(self, dockerfile, maven, gradle):
+        for selected, image, home, variable, command in (
+            (maven, "maven:3-eclipse-temurin-25", "/usr/share/maven", "MAVEN_HOME", "mvn"),
+            (gradle, "gradle:9-jdk25", "/opt/gradle", "GRADLE_HOME", "gradle"),
+        ):
+            copy = f"COPY --from={image} {home} {home}"
+            if selected:
+                self.assertEqual(dockerfile.count(copy), 1)
+                self.assertIn(f"ENV {variable}={home}", dockerfile)
+                self.assertIn(f'ENV PATH="${{{variable}}}/bin:${{PATH}}"', dockerfile)
+                self.assertIn(f"RUN {command} --version", dockerfile)
+                self.assertLess(dockerfile.index("ENV JAVA_HOME="), dockerfile.index(copy))
+                self.assertLess(dockerfile.index(copy), dockerfile.index(f"RUN {command} --version"))
+            else:
+                self.assertNotIn(f"COPY --from={image}", dockerfile)
+                self.assertNotIn(variable, dockerfile)
+                self.assertNotIn(f"RUN {command} --version", dockerfile)
+        self.assertEqual(dockerfile.count("ENV JAVA_HOME="), int("eclipse-temurin:" in dockerfile))
+        # Donor JDKs, caches and entrypoints must not override the chosen runtime.
+        copies = [line for line in dockerfile.splitlines() if line.startswith("COPY ")]
+        self.assertEqual(len(copies), int("eclipse-temurin:" in dockerfile) + int(maven) + int(gradle))
+        self.assertNotIn("mvn-entrypoint", dockerfile)
+        self.assertNotIn("/home/gradle", dockerfile)
+        packages = self.installed_packages(dockerfile)
+        self.assertFalse({"maven", "gradle"} & packages)
+        self.assertFalse(any(package.startswith("openjdk") for package in packages))
+
     def test_all_language_combinations_for_every_release_and_alias(self):
-        names = ("java", "php", "go", "clojure")
+        names = ("java", "php", "go", "clojure", "maven", "gradle")
         number = 0
         for os_name, releases in RELEASES.items():
             for version, tag in releases.items():
@@ -183,9 +240,9 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             LANGUAGES[os_name][name]
                             for name in ("php", "go") if name in selected
                         )
-                        if selected & {"java", "clojure"}:
+                        if selected & {"java", "clojure", "maven", "gradle"}:
                             expected.update(JAVA_PACKAGES[os_name])
-                            self.assert_java(dockerfile, "25")
+                            self.assert_java(dockerfile, "25", os_name)
                         else:
                             self.assertNotIn("eclipse-temurin", dockerfile)
                         if "clojure" in selected:
@@ -201,34 +258,100 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             self.assertIn("&& clojure -Sdescribe", dockerfile)
                         else:
                             self.assertNotIn("CLOJURE_VERSION", dockerfile)
+                        if "gradle" in selected:
+                            expected.add(AWK_PACKAGES[os_name])
+                        self.assert_java_build_tools(dockerfile, "maven" in selected, "gradle" in selected)
                         self.assertEqual(self.installed_packages(dockerfile), expected)
                         self.assertNotIn("mounts", config)
 
-    def test_java_modes_with_and_without_clojure_for_every_release(self):
+    def test_java_modes_with_jdk_dependents_for_every_release(self):
         number = 0
         for os_name, releases in RELEASES.items():
             for version, tag in releases.items():
-                for flag, java_version in (("--java", "25"), ("--java-lts", "25"),
-                                           ("--java-latest", "27")):
-                    for clojure in (False, True):
-                        with self.subTest(os=os_name, version=version, java=flag, clojure=clojure):
-                            output = f"java-modes-{number}"
-                            number += 1
-                            # Exercise both argument orders for the automatic JDK selection.
-                            args = [flag]
-                            if clojure:
-                                args = ["--clojure", flag] if number % 2 else [flag, "--clojure"]
+                for flag, java_version in ((None, "25"), ("--java", "25"),
+                                           ("--java-lts", "25"), ("--java-latest", "27")):
+                    for clojure, maven, gradle in itertools.product(
+                        (False, True), (None, "--maven", "--mvn"), (False, True),
+                    ):
+                        for java_first in (False, True):
+                            with self.subTest(os=os_name, version=version, java=flag,
+                                              clojure=clojure, maven=maven, gradle=gradle,
+                                              java_first=java_first):
+                                output = f"java-modes-{number}"
+                                number += 1
+                                args = []
+                                if clojure:
+                                    args.append("--clojure")
+                                if maven:
+                                    args.append(maven)
+                                if gradle:
+                                    args.append("--gradle")
+                                if flag:
+                                    args = [flag, *args] if java_first else [*args, flag]
+                                self.assert_success(self.run_generator(
+                                    "--os", os_name, "--version", version,
+                                    "--output", output, *args,
+                                ))
+                                dockerfile, _ = self.read_output(output)
+                                expected = self.assert_base(dockerfile, os_name, tag)
+                                if flag or clojure or maven or gradle:
+                                    expected.update(JAVA_PACKAGES[os_name])
+                                    self.assert_java(dockerfile, java_version, os_name)
+                                else:
+                                    self.assertNotIn("eclipse-temurin", dockerfile)
+                                if clojure:
+                                    expected.add("rlwrap")
+                                if gradle:
+                                    expected.add(AWK_PACKAGES[os_name])
+                                self.assert_java_build_tools(dockerfile, bool(maven), gradle)
+                                self.assertEqual(self.installed_packages(dockerfile), expected)
+
+    def test_all_options_together_for_every_release(self):
+        for os_name, releases in RELEASES.items():
+            for version, tag in releases.items():
+                for java in (None, "--java-lts", "--java-latest"):
+                    for maven in ("--maven", "--mvn"):
+                        with self.subTest(os=os_name, version=version, java=java, maven=maven):
+                            output = f"all-{os_name}-{version}-{java}-{maven}"
+                            flags = ["--clojure", maven, "--gradle", "--php", "--go",
+                                     "--claude", "--codex", *("--" + name for name in EXTRAS)]
+                            if java:
+                                flags.append(java)
                             self.assert_success(self.run_generator(
-                                "--os", os_name, "--version", version,
-                                "--output", output, *args,
+                                "--os", os_name, "--version", version, "--output", output, *flags,
                             ))
-                            dockerfile, _ = self.read_output(output)
+                            dockerfile, config = self.read_output(output)
                             expected = self.assert_base(dockerfile, os_name, tag)
-                            expected.update(JAVA_PACKAGES[os_name])
-                            if clojure:
-                                expected.add("rlwrap")
-                            self.assert_java(dockerfile, java_version)
+                            expected.update(JAVA_PACKAGES[os_name], LANGUAGES[os_name].values(),
+                                            DOCKER_PACKAGES[os_name], BUILD_PACKAGES[os_name],
+                                            {"rlwrap", "jq", "unzip", AWK_PACKAGES[os_name]})
+                            if os_name == "ubuntu" and tag == "22.04":
+                                expected.remove("docker-compose-v2")
+                                self.assertIn('"$compose_package"', dockerfile)
                             self.assertEqual(self.installed_packages(dockerfile), expected)
+                            self.assert_java(dockerfile, "27" if java == "--java-latest" else "25", os_name)
+                            self.assert_java_build_tools(dockerfile, True, True)
+                            self.assertEqual(config["mounts"], [
+                                "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+                            ])
+                            self.assertIn("&& clojure -Sdescribe", dockerfile)
+                            self.assertIn("&& claude --version", dockerfile)
+                            self.assertIn("&& codex --version", dockerfile)
+
+    def test_build_tool_flags_and_maven_alias_are_idempotent(self):
+        for os_name in RELEASES:
+            for java in (None, "--java-latest"):
+                with self.subTest(os=os_name, java=java):
+                    output = f"repeated-tools-{os_name}-{java}"
+                    flags = ["--mvn", "--maven", "--mvn", "--gradle", "--gradle"]
+                    if java:
+                        flags.append(java)
+                    self.assert_success(self.run_generator("--os", os_name, "--output", output, *flags))
+                    dockerfile, _ = self.read_output(output)
+                    self.assert_java(dockerfile, "27" if java else "25", os_name)
+                    self.assert_java_build_tools(dockerfile, True, True)
+                    self.assertEqual(dockerfile.count("RUN mvn --version"), 1)
+                    self.assertEqual(dockerfile.count("RUN gradle --version"), 1)
 
     def test_repeated_same_java_mode_is_allowed(self):
         self.assert_success(self.run_generator("--java-lts", "--java", "--java-lts"))
@@ -260,7 +383,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             expected = self.assert_base(dockerfile, os_name, tag)
                             if java:
                                 expected.update(JAVA_PACKAGES[os_name])
-                                self.assert_java(dockerfile, "25" if java == "--java-lts" else "27")
+                                self.assert_java(dockerfile, "25" if java == "--java-lts" else "27", os_name)
                             else:
                                 self.assertNotIn("eclipse-temurin", dockerfile)
                             if claude or codex:
@@ -269,6 +392,8 @@ class GenerateDevcontainerTests(unittest.TestCase):
                                 self.assertNotIn("/root/.local/bin", dockerfile)
                             if claude:
                                 expected.add("libstdc++6" if os_name == "ubuntu" else "libstdc++")
+                                if os_name == "alpine":
+                                    expected.add("libgcc")
                                 self.assertIn("https://claude.ai/install.sh", dockerfile)
                                 self.assertIn("&& bash /tmp/claude-install.sh latest", dockerfile)
                                 self.assertIn("&& rm -f /tmp/claude-install.sh", dockerfile)
@@ -276,7 +401,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             else:
                                 self.assertNotIn("claude-install.sh", dockerfile)
                             if codex:
-                                expected.add("mawk" if os_name == "ubuntu" else "gawk")
+                                expected.add(AWK_PACKAGES[os_name])
                                 self.assertIn("https://chatgpt.com/codex/install.sh", dockerfile)
                                 self.assertIn("&& CODEX_NON_INTERACTIVE=true sh /tmp/codex-install.sh", dockerfile)
                                 self.assertIn("&& rm -f /tmp/codex-install.sh", dockerfile)
@@ -306,13 +431,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
                     ))
                     dockerfile, config = self.read_output(output)
                     expected = self.assert_base(
-                        dockerfile, os_name, "26.04" if os_name == "ubuntu" else "44",
+                        dockerfile, os_name, DEFAULT_TAGS[os_name],
                     )
                     if enabled[0]:
-                        expected.update(
-                            ("docker.io", "docker-compose-v2") if os_name == "ubuntu"
-                            else ("docker-cli", "docker-compose")
-                        )
+                        expected.update(DOCKER_PACKAGES[os_name])
                         self.assertEqual(config["mounts"], [
                             "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
                         ])
@@ -320,10 +442,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                         self.assertNotIn("mounts", config)
                         self.assertNotIn("docker.sock", json.dumps(config))
                     if enabled[1]:
-                        expected.update(
-                            ("build-essential",) if os_name == "ubuntu"
-                            else ("gcc", "gcc-c++", "make")
-                        )
+                        expected.update(BUILD_PACKAGES[os_name])
                     expected.update(name for name, value in zip(EXTRAS[2:], enabled[2:]) if value)
                     self.assertEqual(self.installed_packages(dockerfile), expected)
 
@@ -346,7 +465,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                     elif os_name == "ubuntu":
                         self.assertIn("docker-compose-v2", self.installed_packages(dockerfile))
                     else:
-                        self.assertIn("docker-compose", self.installed_packages(dockerfile))
+                        self.assertTrue(DOCKER_PACKAGES[os_name] <= self.installed_packages(dockerfile))
 
     def test_invalid_arguments_do_not_write(self):
         cases = [
@@ -361,6 +480,15 @@ class GenerateDevcontainerTests(unittest.TestCase):
             ["--os", "fedora", "--version", "lts"],
             ["--os", "fedora", "--version", "26.04"],
             ["--os", "fedora", "--version", "43"],
+            ["--os", "alpine", "--version", "lts"],
+            ["--os", "alpine", "--version", "3.23"],
+            ["--os", "alpine", "--version", "3.24.2"],
+            ["--os", "alpine", "--version", "26.04"],
+            ["--os", "alpine", "--version", "3.24; touch INJECTED"],
+            ["--maven=true"], ["--mvn=true"], ["--gradle=true"],
+            ["--maven", "false"], ["--mvn", "false"], ["--gradle", "false"],
+            ["--maven", "--java-lts", "--java-latest"],
+            ["--gradle", "--java-latest", "--java"],
             ["--java", "false"], ["--output", "valid", "--bad"],
             ["--java-lts", "--java-latest"], ["--java-latest", "--java-lts"],
             ["--java", "--java-latest"], ["--java-latest", "--java"],
@@ -379,12 +507,26 @@ class GenerateDevcontainerTests(unittest.TestCase):
         for args in (["--help"], ["--output", "unused", "--help"]):
             result = self.run_generator(*args)
             self.assert_success(result)
-            self.assertIn("Usage:", result.stdout)
+            self.assertEqual(result.stdout.count("Usage:"), 1)
+            option_names = [
+                line.split()[0] for line in result.stdout.splitlines()
+                if line.startswith("  --")
+            ]
+            self.assertEqual(len(option_names), len(set(option_names)))
+            self.assertNotIn("--java", option_names)
+            self.assertNotIn("--mvn", option_names)
+            self.assertIn("alias: --java", result.stdout)
+            self.assertIn("alias: --mvn", result.stdout)
+            self.assertEqual(result.stdout.count("add Java LTS unless"), 1)
             self.assertNotIn("--vim", result.stdout)
             self.assertNotIn("--tmux", result.stdout)
             for option in ("os", "version", "java", "java-lts", "java-latest", "clojure",
-                           "php", "go", "claude", "codex", *EXTRAS, "force", "output"):
+                           "maven", "mvn", "gradle", "php", "go", "claude", "codex",
+                           *EXTRAS, "force", "output"):
                 self.assertIn("--" + option, result.stdout)
+            self.assertIn("ubuntu|fedora|alpine", result.stdout)
+            self.assertIn("Alpine: current, latest, 3.24", result.stdout)
+            self.assertIn("Alpine current (3.24)", result.stdout)
             self.assertEqual(list(self.root.iterdir()), [])
 
     def test_refusal_preserves_both_files_and_does_not_create_missing_peer(self):
@@ -477,15 +619,20 @@ class GenerateDevcontainerTests(unittest.TestCase):
         self.read_output("trailing slash")
 
     def test_piped_bash_s_invocation_and_literal_workspace_token(self):
-        result = self.run_generator(
-            "--os", "fedora", "--version", "latest", "--java", "--php", "--go",
-            "--docker", "--output", "piped output", piped=True,
-        )
-        self.assert_success(result)
-        dockerfile, config = self.read_output("piped output")
-        self.assert_base(dockerfile, "fedora", "latest")
-        self.assertIn("${localWorkspaceFolder}", config["workspaceMount"])
-        self.assertTrue(set(LANGUAGES["fedora"].values()) <= self.installed_packages(dockerfile))
+        for os_name in RELEASES:
+            with self.subTest(os=os_name):
+                output = f"piped output {os_name}"
+                result = self.run_generator(
+                    "--os", os_name, "--version", "latest", "--mvn", "--gradle",
+                    "--java-latest", "--php", "--go", "--docker", "--output", output, piped=True,
+                )
+                self.assert_success(result)
+                dockerfile, config = self.read_output(output)
+                self.assert_base(dockerfile, os_name, "latest")
+                self.assert_java(dockerfile, "27", os_name)
+                self.assert_java_build_tools(dockerfile, True, True)
+                self.assertIn("${localWorkspaceFolder}", config["workspaceMount"])
+                self.assertTrue(set(LANGUAGES[os_name].values()) <= self.installed_packages(dockerfile))
 
     def test_downloaded_prefix_has_no_side_effects(self):
         source = SCRIPT.read_text().rsplit('main "$@"', 1)[0]

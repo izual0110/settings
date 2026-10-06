@@ -51,6 +51,7 @@ legend { padding: 0; font-size: 17px; font-weight: 650; display: flex; gap: 10px
 .os-icon { border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; font-weight: 650; font-size: 21px; }
 .ubuntu-icon { color: #aa532e; background: #f8e7dc; }
 .fedora-icon { color: #3e638d; background: #e5ecf6; }
+.alpine-icon { color: #24566b; background: #e4eff3; }
 .versions-fieldset { margin-top: 25px; }
 legend.sublegend { font-size: 12px; font-weight: 600; margin-bottom: 12px; }
 .versions { display: flex; flex-wrap: wrap; gap: 8px; }

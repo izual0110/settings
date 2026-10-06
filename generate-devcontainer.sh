@@ -6,13 +6,18 @@ Usage: generate-devcontainer.sh [OPTIONS]
 
 Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
 
-  --os ubuntu|fedora       Distribution (default: ubuntu)
+  --os ubuntu|fedora|alpine
+                          Distribution (default: ubuntu)
   --version VERSION       Ubuntu: lts, current, latest, 22.04, 24.04, 26.04
                           Fedora: current, latest, 44
-                          Default: Ubuntu lts (26.04), Fedora current (44)
-  --java, --java-lts       Install Temurin JDK 25 (LTS)
+                          Alpine: current, latest, 3.24
+                          Default: Ubuntu lts (26.04), Fedora current (44),
+                          Alpine current (3.24)
+  --java-lts              Install Temurin JDK 25 (LTS; alias: --java)
   --java-latest           Install Temurin JDK 27
-  --clojure               Install Clojure CLI (adds Java LTS unless Java is selected)
+  --clojure               Install Clojure CLI
+  --maven                 Install Maven 3 (alias: --mvn)
+  --gradle                Install Gradle 9
   --php                   Install the distribution's PHP CLI
   --go                    Install the distribution's Go toolchain
   --claude                Install Claude Code CLI
@@ -20,14 +25,17 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --docker                Install Docker/Compose and bind the host Docker socket
                           WARNING: socket access grants control of the host daemon
   --build-tools           Install the distribution's compiler/build tools
-  --jq --unzip
-                          Install each selected utility independently
+  --jq                    Install jq
+  --unzip                 Install unzip
   --output DIR            Destination directory
   --force                 Replace existing regular output files only
   --help                  Show this help
 
+Clojure, Maven, and Gradle add Java LTS unless a Java version is selected.
+Java LTS and latest are mutually exclusive.
+
 No packages are installed on the host. Builds use distribution repos,
-Temurin images from Docker Hub for Java, GitHub for Clojure CLI,
+Temurin / Maven / Gradle images from Docker Hub, GitHub for Clojure CLI,
 and official Claude Code / Codex download services for the selected AI tools.
 Ubuntu 22.04 uses docker-compose if docker-compose-v2 is unavailable.
 EOF
@@ -59,6 +67,8 @@ main() (
     force=false
     java=none
     clojure=false
+    maven=false
+    gradle=false
     php=false
     go=false
     claude=false
@@ -92,6 +102,8 @@ main() (
                 shift
                 ;;
             --clojure) clojure=true; shift ;;
+            --maven|--mvn) maven=true; shift ;;
+            --gradle) gradle=true; shift ;;
             --php) php=true; shift ;;
             --go) go=true; shift ;;
             --claude) claude=true; shift ;;
@@ -106,7 +118,7 @@ main() (
         esac
     done
 
-    if [ "$clojure" = true ] && [ "$java" = none ]; then
+    if { [ "$clojure" = true ] || [ "$maven" = true ] || [ "$gradle" = true ]; } && [ "$java" = none ]; then
         java=25
     fi
 
@@ -124,7 +136,7 @@ main() (
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang-go"
             [ "$claude" = false ] || packages="$packages libstdc++6"
-            [ "$codex" = false ] || packages="$packages mawk"
+            { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages mawk"
             [ "$build_tools" = false ] || packages="$packages build-essential"
             if [ "$docker" = true ]; then
                 packages="$packages docker.io"
@@ -145,9 +157,27 @@ main() (
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang"
             [ "$claude" = false ] || packages="$packages libstdc++"
-            [ "$codex" = false ] || packages="$packages gawk"
+            { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages gawk"
             [ "$build_tools" = false ] || packages="$packages gcc gcc-c++ make"
             [ "$docker" = false ] || packages="$packages docker-cli docker-compose"
+            ;;
+        alpine)
+            [ -n "$version" ] || version=current
+            case "$version" in
+                current) tag=3.24 ;;
+                latest|3.24) tag=$version ;;
+                *) fail "Invalid Alpine version: $version" ;;
+            esac
+            image=alpine
+            # GNU sleep supports infinity; Codex also needs GNU fold's -b option.
+            packages='bash ca-certificates curl git tar gzip findutils procps-ng coreutils'
+            [ "$java" = none ] || packages="$packages fontconfig ttf-dejavu libgcc libstdc++ tzdata zlib binutils"
+            [ "$php" = false ] || packages="$packages php-cli"
+            [ "$go" = false ] || packages="$packages go"
+            [ "$claude" = false ] || packages="$packages libgcc libstdc++"
+            { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages gawk"
+            [ "$build_tools" = false ] || packages="$packages build-base"
+            [ "$docker" = false ] || packages="$packages docker-cli docker-cli-compose"
             ;;
         *) fail "Invalid OS: $os" ;;
     esac
@@ -184,16 +214,39 @@ main() (
                 printf '    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends %s \\\n' "$packages"
             fi
             printf '    && rm -rf /var/lib/apt/lists/*\n'
-        else
+        elif [ "$os" = fedora ]; then
             printf 'RUN dnf install -y %s \\\n    && dnf clean all\n' "$packages"
+        else
+            printf 'RUN apk add --no-cache %s\n' "$packages"
         fi
         if [ "$java" != none ]; then
+            java_tag=$java-jdk
+            [ "$os" != alpine ] || java_tag=$java_tag-alpine
             cat <<EOF
 
-COPY --from=eclipse-temurin:$java-jdk /opt/java/openjdk /opt/java/openjdk
+COPY --from=eclipse-temurin:$java_tag /opt/java/openjdk /opt/java/openjdk
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="\${JAVA_HOME}/bin:\${PATH}"
 RUN java --version && javac --version
+EOF
+        fi
+        # Copy only the build tools, never the donor images' JDKs or entrypoints.
+        if [ "$maven" = true ]; then
+            cat <<'EOF'
+
+COPY --from=maven:3-eclipse-temurin-25 /usr/share/maven /usr/share/maven
+ENV MAVEN_HOME=/usr/share/maven
+ENV PATH="${MAVEN_HOME}/bin:${PATH}"
+RUN mvn --version
+EOF
+        fi
+        if [ "$gradle" = true ]; then
+            cat <<'EOF'
+
+COPY --from=gradle:9-jdk25 /opt/gradle /opt/gradle
+ENV GRADLE_HOME=/opt/gradle
+ENV PATH="${GRADLE_HOME}/bin:${PATH}"
+RUN gradle --version
 EOF
         fi
         if [ "$clojure" = true ]; then
