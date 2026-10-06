@@ -1,1 +1,127 @@
-Hello world
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Генератор devcontainer: Ubuntu или Fedora, Java, PHP, Go и инструменты разработки. Два файла одной Bash-командой.">
+    <title>Devcontainer builder</title>
+    <link rel="stylesheet" href="devcontainer.css">
+    <script src="devcontainer.js" defer></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <a class="brand" href="./"><span class="brand-icon" aria-hidden="true">[·]</span> settings <span class="brand-divider">/</span> devcontainer</a>
+        <a class="source-link" href="https://github.com/izual0110/settings">Исходный код ↗</a>
+      </header>
+
+      <main>
+        <div class="intro">
+          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> YOUR STACK. YOUR CONTAINER.</p>
+          <h1>Среда разработки.<br><span>Одной командой.</span></h1>
+          <p class="intro-text">Выберите Linux, языки и инструменты. Скопируйте команду в терминал проекта — Bash соберёт вашу <code>.devcontainer</code>.</p>
+        </div>
+
+        <noscript><p class="notice">Для интерактивного выбора нужен JavaScript. Можно <a href="generate-devcontainer.sh">скачать скрипт</a> и запустить <code>bash generate-devcontainer.sh --help</code>.</p></noscript>
+
+        <div class="builder">
+          <form id="configuration" class="configuration">
+            <section class="panel">
+              <fieldset>
+                <legend><span class="step">01</span> Операционная система</legend>
+                <p class="section-note">Один контейнер — один Linux.</p>
+                <div class="os-grid">
+                  <label class="choice os-choice">
+                    <input type="radio" name="os" value="ubuntu" checked>
+                    <span class="os-icon ubuntu-icon" aria-hidden="true">U</span>
+                    <span><strong>Ubuntu</strong><small>Стабильная база · apt</small></span>
+                  </label>
+                  <label class="choice os-choice">
+                    <input type="radio" name="os" value="fedora">
+                    <span class="os-icon fedora-icon" aria-hidden="true">f</span>
+                    <span><strong>Fedora</strong><small>Свежие пакеты · dnf</small></span>
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset class="versions-fieldset">
+                <legend class="sublegend">Версия образа</legend>
+                <div id="versions" class="versions"></div>
+                <p class="section-note">Релизы фиксируются в генераторе. <code>latest</code> — плавающий тег издателя образа, он может меняться между сборками.</p>
+              </fieldset>
+            </section>
+
+            <section class="panel">
+              <fieldset>
+                <legend><span class="step">02</span> Языки</legend>
+                <p class="section-note">Можно выбрать несколько — или оставить только Linux.</p>
+                <div class="language-grid">
+                  <label class="choice language-choice">
+                    <input type="checkbox" data-flag="java" checked>
+                    <span class="language-symbol" aria-hidden="true">J</span>
+                    <span><strong>Java</strong><small>OpenJDK · JDK</small></span>
+                  </label>
+                  <label class="choice language-choice">
+                    <input type="checkbox" data-flag="php">
+                    <span class="language-symbol" aria-hidden="true">php</span>
+                    <span><strong>PHP</strong><small>CLI</small></span>
+                  </label>
+                  <label class="choice language-choice">
+                    <input type="checkbox" data-flag="go">
+                    <span class="language-symbol" aria-hidden="true">Go</span>
+                    <span><strong>Golang</strong><small>Go toolchain</small></span>
+                  </label>
+                </div>
+                <p class="section-note footnote">Версии языков зависят от репозиториев выбранного Linux. Генератор не устанавливает SDK на ваш компьютер.</p>
+              </fieldset>
+            </section>
+
+            <section class="panel">
+              <fieldset>
+                <legend><span class="step">03</span> Инструменты</legend>
+                <p class="section-note">Bash, Git, curl, CA-сертификаты, tar, gzip, find и ps уже включены.</p>
+                <div class="tools-grid">
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="build-tools"><span><strong>Build tools</strong><small>C / C++ · make</small></span></label>
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="jq"><span><strong>jq</strong><small>Работа с JSON</small></span></label>
+
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="unzip"><span><strong>unzip</strong><small>ZIP-архивы</small></span></label>
+                  <label class="choice tool-choice"><input id="docker" type="checkbox" data-flag="docker" aria-describedby="docker-note"><span><strong>Docker + Compose</strong><small>Docker хоста из контейнера</small></span></label>
+                </div>
+                <p id="docker-note" class="section-note footnote">Docker подключает <code>/var/run/docker.sock</code>. Доступ к сокету даёт контейнеру управление Docker-демоном хоста; включайте только для доверенных проектов.</p>
+                <p id="docker-warning" class="notice warning" hidden>Docker-сокет будет смонтирован в контейнер. На Linux это может дать доступ с правами root к хосту. Для Ubuntu 22.04 возможен fallback на Compose v1.</p>
+              </fieldset>
+            </section>
+            <button id="reset" class="text-button" type="button">Сбросить выбор ↺</button>
+          </form>
+
+          <aside class="result" aria-labelledby="result-title">
+            <div class="result-panel">
+              <div class="result-header"><span class="eyebrow">READY TO BUILD</span><span class="file-count">2 файла</span></div>
+              <h2 id="result-title">Ваш devcontainer</h2>
+              <p id="summary" class="result-summary" aria-live="polite">Ubuntu · Java</p>
+              <div class="image-line"><span class="status-dot" aria-hidden="true"></span><code id="image">ubuntu:26.04</code></div>
+              <div class="terminal">
+                <div class="terminal-header"><span aria-hidden="true">● ● ●</span><span>терминал · корень проекта</span></div>
+                <label class="sr-only" for="command">Команда генерации devcontainer</label>
+                <textarea id="command" readonly spellcheck="false" rows="5" wrap="soft"></textarea>
+              </div>
+              <button id="copy" class="copy-button" type="button" disabled>Скопировать команду <span aria-hidden="true">↗</span></button>
+              <p id="copy-status" class="copy-status" role="status"></p>
+              <label class="force-option"><input id="force" type="checkbox" form="configuration" data-flag="force"><span>Перезаписать существующие файлы <code>--force</code></span></label>
+              <p class="section-note">По умолчанию существующие файлы не меняются. Скрипт только генерирует конфигурацию, не запускает Docker и не требует <code>sudo</code>.</p>
+              <div class="file-tree" aria-label="Создаваемые файлы"><code>.devcontainer/<br>├── Dockerfile<br>└── devcontainer.json</code></div>
+              <ol class="instructions">
+                <li>Запустите команду в папке проекта.</li>
+                <li>Откройте проект через Dev Containers в редакторе.</li>
+                <li>Редактор соберёт образ и запустит контейнер.</li>
+              </ol>
+              <a class="script-link" href="generate-devcontainer.sh">Посмотреть Bash-скрипт перед запуском ↗</a>
+              <p class="section-note publish-note">Команда скачивает скрипт из ветки <code>master</code> репозитория <code>izual0110/settings</code>. Новые изменения доступны по ссылке после публикации в GitHub.</p>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer><span>Без бэкенда. Без зависимостей. Только ваши настройки.</span></footer>
+    </div>
+  </body>
+</html>
