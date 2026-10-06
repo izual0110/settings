@@ -205,6 +205,28 @@ for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : 
     assert.equal(page.byId("image").textContent, "alpine:latest");
   });
 
+  test(`${backend}: MariaDB client is optional and works for every distribution`, () => {
+    const page = loadPage(backend);
+    assert.equal(page.flag("mariadb").checked, false);
+    page.check("java", false);
+    for (const [os, version, label] of [
+      ["ubuntu", "lts", "Ubuntu"],
+      ["fedora", "current", "Fedora"],
+      ["alpine", "current", "Alpine"],
+    ]) {
+      page.radio("os", os);
+      page.check("mariadb", true);
+      assert.equal(page.byId("command").value, expectedCommand(`--os ${os} --version ${version} --mariadb`));
+      assert.equal(page.byId("summary").textContent, `${label} · MariaDB client`);
+      page.check("mariadb", false);
+      assert.equal(page.byId("command").value, expectedCommand(`--os ${os} --version ${version}`));
+    }
+    page.check("mariadb", true);
+    page.reset();
+    assert.equal(page.flag("mariadb").checked, false);
+    assert.equal(page.byId("command").value, expectedCommand("--os ubuntu --version lts --java-lts"));
+  });
+
   test(`${backend}: disabled Java tools retain checks but cannot leak flags`, () => {
     const page = loadPage(backend);
     page.radio("os", "alpine");

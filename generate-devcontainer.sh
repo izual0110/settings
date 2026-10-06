@@ -27,6 +27,7 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --build-tools           Install the distribution's compiler/build tools
   --jq                    Install jq
   --unzip                 Install unzip
+  --mariadb               Install the distribution's MariaDB client (no server)
   --output DIR            Destination directory
   --force                 Replace existing regular output files only
   --help                  Show this help
@@ -77,6 +78,7 @@ main() (
     build_tools=false
     jq=false
     unzip=false
+    mariadb=false
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -112,6 +114,7 @@ main() (
             --build-tools) build_tools=true; shift ;;
             --jq) jq=true; shift ;;
             --unzip) unzip=true; shift ;;
+            --mariadb) mariadb=true; shift ;;
             --force) force=true; shift ;;
             --help) usage; exit 0 ;;
             *) fail "Unknown argument: $1" ;;
@@ -135,6 +138,7 @@ main() (
             [ "$java" = none ] || packages="$packages fontconfig libstdc++6 tzdata zlib1g binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang-go"
+            [ "$mariadb" = false ] || packages="$packages mariadb-client"
             [ "$claude" = false ] || packages="$packages libstdc++6"
             { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages mawk"
             [ "$build_tools" = false ] || packages="$packages build-essential"
@@ -156,6 +160,7 @@ main() (
             [ "$java" = none ] || packages="$packages fontconfig libstdc++ tzdata zlib binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang"
+            [ "$mariadb" = false ] || packages="$packages mariadb"
             [ "$claude" = false ] || packages="$packages libstdc++"
             { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages gawk"
             [ "$build_tools" = false ] || packages="$packages gcc gcc-c++ make"
@@ -174,6 +179,7 @@ main() (
             [ "$java" = none ] || packages="$packages fontconfig ttf-dejavu libgcc libstdc++ tzdata zlib binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages go"
+            [ "$mariadb" = false ] || packages="$packages mariadb-client"
             [ "$claude" = false ] || packages="$packages libgcc libstdc++"
             { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages gawk"
             [ "$build_tools" = false ] || packages="$packages build-base"

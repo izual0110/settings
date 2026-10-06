@@ -27,7 +27,7 @@ jobs:
             --os "${{ matrix.os }}" \
             --version latest \
             --java-lts --maven --gradle --clojure --php --go --claude --codex \
-            --docker --build-tools --jq --unzip \
+            --docker --build-tools --jq --unzip --mariadb \
             --output .ci-devcontainer
 
       - name: Set up Docker Buildx

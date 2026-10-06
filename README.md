@@ -24,6 +24,8 @@ Selecting Java (or Clojure, which includes Java) reveals optional Maven (`mvn`) 
 bash /path/to/settings/generate-devcontainer.sh --os alpine --java-lts --maven --gradle
 ```
 
+Use `--mariadb` (or the **MariaDB client** checkbox under Tools) to install the distribution's SQL client without a database server: `mariadb-client` on Ubuntu/Alpine, `mariadb` on Fedora.
+
 ## CI
 
 GitHub Actions builds Docker images for Ubuntu, Fedora, and Alpine `latest` on pushes, pull requests, and manual runs. All builds enable all optional packages, including Maven and Gradle, using Java LTS because the LTS and latest Java options are mutually exclusive. Images are built for validation only and are not published. Docker BuildKit layers are cached in GitHub Actions separately for each distribution; builds still check for updated base images.

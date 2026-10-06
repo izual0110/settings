@@ -39,7 +39,7 @@ const FLAG_LABELS = {
   java: "Java 25 LTS", "java-lts": "Java 25 LTS", "java-latest": "Java 27 (latest)",
   maven: "Maven", gradle: "Gradle",
   clojure: "Clojure CLI 1.12.6.1673", php: "PHP", go: "Go", "build-tools": "Build tools",
-  jq: "jq", unzip: "unzip", docker: "Docker + Compose",
+  jq: "jq", unzip: "unzip", mariadb: "MariaDB client", docker: "Docker + Compose",
   claude: "Claude Code", codex: "Codex",
   force: "overwrite files",
 };

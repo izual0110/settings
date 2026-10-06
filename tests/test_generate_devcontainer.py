@@ -46,7 +46,8 @@ BUILD_PACKAGES = {
     "fedora": {"gcc", "gcc-c++", "make"},
     "alpine": {"build-base"},
 }
-EXTRAS = ("docker", "build-tools", "jq", "unzip")
+MARIADB_PACKAGES = {"ubuntu": "mariadb-client", "fedora": "mariadb", "alpine": "mariadb-client"}
+EXTRAS = ("docker", "build-tools", "jq", "unzip", "mariadb")
 
 
 @unittest.skipUnless(BASH, "Bash is required")
@@ -324,7 +325,8 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             expected = self.assert_base(dockerfile, os_name, tag)
                             expected.update(JAVA_PACKAGES[os_name], LANGUAGES[os_name].values(),
                                             DOCKER_PACKAGES[os_name], BUILD_PACKAGES[os_name],
-                                            {"rlwrap", "jq", "unzip", AWK_PACKAGES[os_name]})
+                                            {"rlwrap", "jq", "unzip", AWK_PACKAGES[os_name],
+                                             MARIADB_PACKAGES[os_name]})
                             if os_name == "ubuntu" and tag == "22.04":
                                 expected.remove("docker-compose-v2")
                                 self.assertIn('"$compose_package"', dockerfile)
@@ -443,8 +445,28 @@ class GenerateDevcontainerTests(unittest.TestCase):
                         self.assertNotIn("docker.sock", json.dumps(config))
                     if enabled[1]:
                         expected.update(BUILD_PACKAGES[os_name])
-                    expected.update(name for name, value in zip(EXTRAS[2:], enabled[2:]) if value)
+                    expected.update(
+                        MARIADB_PACKAGES[os_name] if name == "mariadb" else name
+                        for name, value in zip(EXTRAS[2:], enabled[2:]) if value
+                    )
                     self.assertEqual(self.installed_packages(dockerfile), expected)
+
+    def test_mariadb_client_for_every_release_and_repeated_flag(self):
+        for os_name, releases in RELEASES.items():
+            for version, tag in releases.items():
+                with self.subTest(os=os_name, version=version):
+                    output = f"mariadb-{os_name}-{version}"
+                    self.assert_success(self.run_generator(
+                        "--os", os_name, "--version", version, "--output", output,
+                        "--mariadb", "--mariadb",
+                    ))
+                    dockerfile, config = self.read_output(output)
+                    expected = self.assert_base(dockerfile, os_name, tag)
+                    expected.add(MARIADB_PACKAGES[os_name])
+                    self.assertEqual(self.installed_packages(dockerfile), expected)
+                    self.assertEqual(shlex.split(dockerfile).count(MARIADB_PACKAGES[os_name]), 1)
+                    self.assertNotIn("mariadb-server", dockerfile)
+                    self.assertNotIn("mounts", config)
 
     def test_docker_for_every_release_including_jammy_compose_fallback(self):
         for os_name, releases in RELEASES.items():
