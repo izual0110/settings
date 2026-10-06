@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Генератор devcontainer: Ubuntu или Fedora, Java, PHP, Go и инструменты разработки. Два файла одной Bash-командой.">
+    <meta name="description" content="Генератор devcontainer: Ubuntu или Fedora, Java, Clojure, PHP, Go и инструменты разработки. Два файла одной Bash-командой.">
     <title>Devcontainer builder</title>
     <link rel="stylesheet" href="devcontainer.css">
     <script src="devcontainer.js" defer></script>
@@ -55,10 +55,24 @@
                 <legend><span class="step">02</span> Языки</legend>
                 <p class="section-note">Можно выбрать несколько — или оставить только Linux.</p>
                 <div class="language-grid">
+                  <div>
+                    <label class="choice language-choice">
+                      <input id="java" type="checkbox" data-flag="java" checked>
+                      <span class="language-symbol" aria-hidden="true">J</span>
+                      <span><strong>Java</strong><small>Eclipse Temurin · JDK</small></span>
+                    </label>
+                    <fieldset id="java-versions" class="versions-fieldset">
+                      <legend class="sublegend">Версия Java</legend>
+                      <div class="versions">
+                        <label class="choice version-choice"><input type="radio" name="java-version" value="java-lts" checked><span>25 LTS</span></label>
+                        <label class="choice version-choice"><input type="radio" name="java-version" value="java-latest"><span>27 latest</span></label>
+                      </div>
+                    </fieldset>
+                  </div>
                   <label class="choice language-choice">
-                    <input type="checkbox" data-flag="java" checked>
-                    <span class="language-symbol" aria-hidden="true">J</span>
-                    <span><strong>Java</strong><small>OpenJDK · JDK</small></span>
+                    <input id="clojure" type="checkbox" data-flag="clojure">
+                    <span class="language-symbol" aria-hidden="true">Clj</span>
+                    <span><strong>Clojure</strong><small>CLI 1.12.6.1673 · Java</small></span>
                   </label>
                   <label class="choice language-choice">
                     <input type="checkbox" data-flag="php">
@@ -71,7 +85,7 @@
                     <span><strong>Golang</strong><small>Go toolchain</small></span>
                   </label>
                 </div>
-                <p class="section-note footnote">Версии языков зависят от репозиториев выбранного Linux. Генератор не устанавливает SDK на ваш компьютер.</p>
+                <p class="section-note footnote">Java: 25 LTS или 27 из образов Eclipse Temurin (Docker Hub). Clojure CLI 1.12.6.1673: официальный установщик из GitHub, rlwrap и выбранная Java (по умолчанию 25 LTS). PHP и Go — из репозиториев Linux. Сеть нужна при сборке контейнера; SDK на хост не устанавливаются.</p>
               </fieldset>
             </section>
 
@@ -85,7 +99,10 @@
 
                   <label class="choice tool-choice"><input type="checkbox" data-flag="unzip"><span><strong>unzip</strong><small>ZIP-архивы</small></span></label>
                   <label class="choice tool-choice"><input id="docker" type="checkbox" data-flag="docker" aria-describedby="docker-note"><span><strong>Docker + Compose</strong><small>Docker хоста из контейнера</small></span></label>
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="claude" aria-describedby="ai-note"><span><strong>Claude Code</strong><small>CLI · Anthropic</small></span></label>
+                  <label class="choice tool-choice"><input type="checkbox" data-flag="codex" aria-describedby="ai-note"><span><strong>Codex</strong><small>CLI · OpenAI</small></span></label>
                 </div>
+                <p id="ai-note" class="section-note footnote">Claude Code и Codex устанавливаются только в контейнер. После запуска нужна авторизация; использование сервисов зависит от тарифа. Ключи и настройки хоста не копируются.</p>
                 <p id="docker-note" class="section-note footnote">Docker подключает <code>/var/run/docker.sock</code>. Доступ к сокету даёт контейнеру управление Docker-демоном хоста; включайте только для доверенных проектов.</p>
                 <p id="docker-warning" class="notice warning" hidden>Docker-сокет будет смонтирован в контейнер. На Linux это может дать доступ с правами root к хосту. Для Ubuntu 22.04 возможен fallback на Compose v1.</p>
               </fieldset>
@@ -97,7 +114,7 @@
             <div class="result-panel">
               <div class="result-header"><span class="eyebrow">READY TO BUILD</span><span class="file-count">2 файла</span></div>
               <h2 id="result-title">Ваш devcontainer</h2>
-              <p id="summary" class="result-summary" aria-live="polite">Ubuntu · Java</p>
+              <p id="summary" class="result-summary" aria-live="polite">Ubuntu · Java 25 LTS</p>
               <div class="image-line"><span class="status-dot" aria-hidden="true"></span><code id="image">ubuntu:26.04</code></div>
               <div class="terminal">
                 <div class="terminal-header"><span aria-hidden="true">● ● ●</span><span>терминал · корень проекта</span></div>

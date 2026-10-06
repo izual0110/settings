@@ -27,8 +27,10 @@ const DISTRIBUTIONS = {
 };
 
 const FLAG_LABELS = {
-  java: "Java", php: "PHP", go: "Go", "build-tools": "Build tools",
+  java: "Java 25 LTS", "java-lts": "Java 25 LTS", "java-latest": "Java 27 (latest)",
+  clojure: "Clojure CLI 1.12.6.1673", php: "PHP", go: "Go", "build-tools": "Build tools",
   jq: "jq", unzip: "unzip", docker: "Docker + Compose",
+  claude: "Claude Code", codex: "Codex",
   force: "перезапись файлов",
 };
 
@@ -37,6 +39,9 @@ function buildCommand(os, version, flags) {
       !DISTRIBUTIONS[os].versions.some((release) => release.value === version) ||
       flags.some((flag) => !Object.hasOwnProperty.call(FLAG_LABELS, flag))) {
     throw new Error("Неизвестная опция генератора");
+  }
+  if (flags.filter((flag) => ["java", "java-lts", "java-latest"].includes(flag)).length > 1) {
+    throw new Error("Опции --java, --java-lts и --java-latest взаимоисключающие");
   }
   const args = ["--os", os, "--version", version, ...flags.map((flag) => `--${flag}`)];
   return `curl -fsSL '${SCRIPT_URL}' | bash -s -- ${args.join(" ")}`;
@@ -78,10 +83,17 @@ function renderVersions() {
 function updateCommand() {
   const os = selectedOS();
   const version = form.querySelector('input[name="version"]:checked').value;
+  const javaEnabled = document.getElementById("java").checked || document.getElementById("clojure").checked;
+  const javaVersions = document.getElementById("java-versions");
+  javaVersions.hidden = !javaEnabled;
+  javaVersions.disabled = !javaEnabled;
   // form.elements also includes the --force checkbox outside the form.
   const flags = Array.from(form.elements)
-    .filter((input) => input.checked && input.dataset.flag)
+    .filter((input) => input.checked && input.dataset.flag && input.dataset.flag !== "java")
     .map((input) => input.dataset.flag);
+  if (javaEnabled) {
+    flags.unshift(form.querySelector('input[name="java-version"]:checked').value);
+  }
   const distribution = DISTRIBUTIONS[os];
   const release = distribution.versions.find((candidate) => candidate.value === version);
   command.value = buildCommand(os, version, flags);

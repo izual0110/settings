@@ -10,9 +10,13 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --version VERSION       Ubuntu: lts, current, latest, 22.04, 24.04, 26.04
                           Fedora: current, latest, 44
                           Default: Ubuntu lts (26.04), Fedora current (44)
-  --java                  Install the distribution's JDK
+  --java, --java-lts       Install Temurin JDK 25 (LTS)
+  --java-latest           Install Temurin JDK 27
+  --clojure               Install Clojure CLI (adds Java LTS unless Java is selected)
   --php                   Install the distribution's PHP CLI
   --go                    Install the distribution's Go toolchain
+  --claude                Install Claude Code CLI
+  --codex                 Install OpenAI Codex CLI
   --docker                Install Docker/Compose and bind the host Docker socket
                           WARNING: socket access grants control of the host daemon
   --build-tools           Install the distribution's compiler/build tools
@@ -22,7 +26,9 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --force                 Replace existing regular output files only
   --help                  Show this help
 
-No packages are installed on the host. Container builds use distribution repos.
+No packages are installed on the host. Builds use distribution repos,
+Temurin images from Docker Hub for Java, GitHub for Clojure CLI,
+and official Claude Code / Codex download services for the selected AI tools.
 Ubuntu 22.04 uses docker-compose if docker-compose-v2 is unavailable.
 EOF
 }
@@ -51,13 +57,15 @@ main() (
     version=
     output=.devcontainer
     force=false
-    java=false
+    java=none
+    clojure=false
     php=false
     go=false
+    claude=false
+    codex=false
     docker=false
     build_tools=false
     jq=false
-
     unzip=false
 
     while [ "$#" -gt 0 ]; do
@@ -74,19 +82,33 @@ main() (
                 esac
                 shift 2
                 ;;
-            --java) java=true; shift ;;
+            --java|--java-lts|--java-latest)
+                java_version=25
+                [ "$1" != --java-latest ] || java_version=27
+                if [ "$java" != none ] && [ "$java" != "$java_version" ]; then
+                    fail "Choose either Java LTS or latest, not both"
+                fi
+                java=$java_version
+                shift
+                ;;
+            --clojure) clojure=true; shift ;;
             --php) php=true; shift ;;
             --go) go=true; shift ;;
+            --claude) claude=true; shift ;;
+            --codex) codex=true; shift ;;
             --docker) docker=true; shift ;;
             --build-tools) build_tools=true; shift ;;
             --jq) jq=true; shift ;;
-
             --unzip) unzip=true; shift ;;
             --force) force=true; shift ;;
             --help) usage; exit 0 ;;
             *) fail "Unknown argument: $1" ;;
         esac
     done
+
+    if [ "$clojure" = true ] && [ "$java" = none ]; then
+        java=25
+    fi
 
     case "$os" in
         ubuntu)
@@ -98,9 +120,11 @@ main() (
             esac
             image=ubuntu
             packages='bash ca-certificates curl git tar gzip findutils procps'
-            [ "$java" = false ] || packages="$packages default-jdk"
+            [ "$java" = none ] || packages="$packages fontconfig libstdc++6 tzdata zlib1g binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang-go"
+            [ "$claude" = false ] || packages="$packages libstdc++6"
+            [ "$codex" = false ] || packages="$packages mawk"
             [ "$build_tools" = false ] || packages="$packages build-essential"
             if [ "$docker" = true ]; then
                 packages="$packages docker.io"
@@ -117,17 +141,19 @@ main() (
             esac
             image=quay.io/fedora/fedora
             packages='bash ca-certificates curl git tar gzip findutils procps-ng'
-            [ "$java" = false ] || packages="$packages java-latest-openjdk-devel"
+            [ "$java" = none ] || packages="$packages fontconfig libstdc++ tzdata zlib binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang"
+            [ "$claude" = false ] || packages="$packages libstdc++"
+            [ "$codex" = false ] || packages="$packages gawk"
             [ "$build_tools" = false ] || packages="$packages gcc gcc-c++ make"
             [ "$docker" = false ] || packages="$packages docker-cli docker-compose"
             ;;
         *) fail "Invalid OS: $os" ;;
     esac
     [ "$jq" = false ] || packages="$packages jq"
-
     [ "$unzip" = false ] || packages="$packages unzip"
+    [ "$clojure" = false ] || packages="$packages rlwrap"
 
     # Prefix relative paths so a leading dash is never interpreted as an option.
     case "$output" in
@@ -145,7 +171,6 @@ main() (
     check_targets
     mkdir -p -- "$output"
 
-
     {
         printf 'FROM %s:%s\n\n' "$image" "$tag"
         if [ "$os" = ubuntu ]; then
@@ -161,6 +186,51 @@ main() (
             printf '    && rm -rf /var/lib/apt/lists/*\n'
         else
             printf 'RUN dnf install -y %s \\\n    && dnf clean all\n' "$packages"
+        fi
+        if [ "$java" != none ]; then
+            cat <<EOF
+
+COPY --from=eclipse-temurin:$java-jdk /opt/java/openjdk /opt/java/openjdk
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="\${JAVA_HOME}/bin:\${PATH}"
+RUN java --version && javac --version
+EOF
+        fi
+        if [ "$clojure" = true ]; then
+            cat <<'EOF'
+
+ARG CLOJURE_VERSION=1.12.6.1673
+RUN curl -fsSL -o /tmp/linux-install.sh \
+      "https://github.com/clojure/brew-install/releases/download/${CLOJURE_VERSION}/linux-install.sh" \
+    && cd /tmp \
+    && bash linux-install.sh \
+    && rm -f linux-install.sh \
+    && clojure -Sdescribe
+EOF
+        fi
+        if [ "$claude" = true ] || [ "$codex" = true ]; then
+            cat <<'EOF'
+
+ENV PATH="/root/.local/bin:${PATH}"
+EOF
+        fi
+        if [ "$claude" = true ]; then
+            cat <<'EOF'
+
+RUN curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh \
+    && bash /tmp/claude-install.sh latest \
+    && rm -f /tmp/claude-install.sh \
+    && claude --version
+EOF
+        fi
+        if [ "$codex" = true ]; then
+            cat <<'EOF'
+
+RUN curl -fsSL -o /tmp/codex-install.sh https://chatgpt.com/codex/install.sh \
+    && CODEX_NON_INTERACTIVE=true sh /tmp/codex-install.sh \
+    && rm -f /tmp/codex-install.sh \
+    && codex --version
+EOF
         fi
         printf '\nRUN git config --system --add safe.directory /workspace\n'
         printf '\nWORKDIR /workspace\nCMD ["sleep", "infinity"]\n'
@@ -179,7 +249,6 @@ EOF
         fi
         printf '  "shutdownAction": "stopContainer"\n}\n'
     } > "$output/devcontainer.json"
-
 
     printf 'Generated %s/Dockerfile and %s/devcontainer.json\n' "$output" "$output"
 )
