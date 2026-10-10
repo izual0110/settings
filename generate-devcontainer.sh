@@ -298,7 +298,7 @@ EOF
 
     cat <<'EOF' > "$output/devcontainer.json"
 {
-  "name": "Development container for ${localWorkspaceFolderBasename}",
+  "name": "${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
