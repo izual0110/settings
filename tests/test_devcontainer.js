@@ -196,6 +196,7 @@ for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : 
     assertJavaControls(page, true);
     assert.equal(page.flag("maven").checked, false);
     assert.equal(page.flag("gradle").checked, false);
+    assert.equal(page.byId("docker-warning").hidden, false);
 
     page.radio("os", "alpine");
     assert.equal(page.byId("command").value, expectedCommand("--os alpine --version current --java-lts"));
@@ -275,7 +276,7 @@ for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : 
     page.radio("os", "alpine");
     page.radio("version", "latest");
     page.radio("java-version", "java-latest");
-    for (const name of ["maven", "gradle", "clojure", "php", "go", "docker", "force"]) page.check(name, true);
+    for (const name of ["maven", "gradle", "clojure", "php", "go", "force"]) page.check(name, true);
     assert.equal(page.byId("docker-warning").hidden, false);
     assert.ok(page.byId("command").value.endsWith(" --force"));
     page.check("java", false);
@@ -285,14 +286,14 @@ for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : 
 
     page.reset();
     assert.equal(page.flag("java").checked, true);
-    for (const name of ["maven", "gradle", "clojure", "php", "go", "docker", "force"]) {
+    for (const name of ["maven", "gradle", "clojure", "php", "go", "force"]) {
       assert.equal(page.flag(name).checked, false, `${name} reset`);
     }
     assertJavaControls(page, true);
     assert.equal(page.byId("command").value, expectedCommand("--os ubuntu --version lts --java-lts"));
     assert.equal(page.byId("image").textContent, "ubuntu:26.04");
     assert.equal(page.byId("summary").textContent, "Ubuntu · Java 25 LTS");
-    assert.equal(page.byId("docker-warning").hidden, true);
+    assert.equal(page.byId("docker-warning").hidden, false);
     assert.equal(page.byId("copy-status").textContent, "");
   });
 
@@ -305,6 +306,7 @@ for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : 
       ["debian", "current", []], ["__proto__", "current", []],
       ["alpine", "lts", []], ["alpine", "current; touch INJECTED", []],
       ["ubuntu", "lts", ["unknown"]], ["ubuntu", "lts", ["__proto__"]],
+      ["ubuntu", "lts", ["docker"]],
       ["ubuntu", "lts", ["maven; touch INJECTED"]],
     ]) {
       assert.throws(() => buildCommand(...args), /Unknown generator option/);

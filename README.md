@@ -16,6 +16,10 @@ Creates `.devcontainer/Dockerfile` and `.devcontainer/devcontainer.json`. Then r
 
 Use `--help` for all options or `--force` to replace existing generated files.
 
+Python 3 is installed by default from the distribution's repositories on Ubuntu, Fedora, and Alpine; no flag is required.
+
+Docker/Compose tools are always installed and the host Docker socket (`/var/run/docker.sock`) is always mounted. The host must provide this socket. **Warning:** socket access lets the container control the host's Docker daemon and may grant root-level access on Linux; use only for trusted projects.
+
 Alpine defaults to `3.24` (`--version current`); `--version latest` follows the publisher's floating tag. Java uses musl-compatible Temurin images on Alpine.
 
 Selecting Java (or Clojure, which includes Java) reveals optional Maven (`mvn`) and Gradle checkboxes. From the CLI, use `--maven` (alias `--mvn`) and/or `--gradle`; either adds Java LTS if no Java version was selected. Both tools use the selected JDK and are copied from official Docker images, without installing another JDK.

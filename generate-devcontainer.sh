@@ -22,8 +22,7 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --go                    Install the distribution's Go toolchain
   --claude                Install Claude Code CLI
   --codex                 Install OpenAI Codex CLI
-  --docker                Install Docker/Compose and bind the host Docker socket
-                          WARNING: socket access grants control of the host daemon
+
   --build-tools           Install the distribution's compiler/build tools
   --jq                    Install jq
   --unzip                 Install unzip
@@ -34,6 +33,10 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
 
 Clojure, Maven, and Gradle add Java LTS unless a Java version is selected.
 Java LTS and latest are mutually exclusive.
+
+Python 3 and Docker/Compose are installed by default.
+The host Docker socket (/var/run/docker.sock) is always mounted.
+WARNING: socket access grants control of the host daemon; use only for trusted projects.
 
 No packages are installed on the host. Builds use distribution repos,
 Temurin / Maven / Gradle images from Docker Hub, GitHub for Clojure CLI,
@@ -74,7 +77,7 @@ main() (
     go=false
     claude=false
     codex=false
-    docker=false
+
     build_tools=false
     jq=false
     unzip=false
@@ -110,7 +113,7 @@ main() (
             --go) go=true; shift ;;
             --claude) claude=true; shift ;;
             --codex) codex=true; shift ;;
-            --docker) docker=true; shift ;;
+
             --build-tools) build_tools=true; shift ;;
             --jq) jq=true; shift ;;
             --unzip) unzip=true; shift ;;
@@ -134,7 +137,7 @@ main() (
                 *) fail "Invalid Ubuntu version: $version" ;;
             esac
             image=ubuntu
-            packages='bash ca-certificates curl git tar gzip findutils procps'
+            packages='bash ca-certificates curl git tar gzip findutils procps python3'
             [ "$java" = none ] || packages="$packages fontconfig libstdc++6 tzdata zlib1g binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang-go"
@@ -142,11 +145,9 @@ main() (
             [ "$claude" = false ] || packages="$packages libstdc++6"
             { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages mawk"
             [ "$build_tools" = false ] || packages="$packages build-essential"
-            if [ "$docker" = true ]; then
-                packages="$packages docker.io"
-                # Jammy repositories may not include the newer Compose package.
-                [ "$tag" = 22.04 ] || packages="$packages docker-compose-v2"
-            fi
+            packages="$packages docker.io"
+            # Jammy repositories may not include the newer Compose package.
+            [ "$tag" = 22.04 ] || packages="$packages docker-compose-v2"
             ;;
         fedora)
             [ -n "$version" ] || version=current
@@ -156,7 +157,7 @@ main() (
                 *) fail "Invalid Fedora version: $version" ;;
             esac
             image=quay.io/fedora/fedora
-            packages='bash ca-certificates curl git tar gzip findutils procps-ng'
+            packages='bash ca-certificates curl git tar gzip findutils procps-ng python3'
             [ "$java" = none ] || packages="$packages fontconfig libstdc++ tzdata zlib binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages golang"
@@ -164,7 +165,7 @@ main() (
             [ "$claude" = false ] || packages="$packages libstdc++"
             { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages gawk"
             [ "$build_tools" = false ] || packages="$packages gcc gcc-c++ make"
-            [ "$docker" = false ] || packages="$packages docker-cli docker-compose"
+            packages="$packages docker-cli docker-compose"
             ;;
         alpine)
             [ -n "$version" ] || version=current
@@ -175,7 +176,7 @@ main() (
             esac
             image=alpine
             # GNU sleep supports infinity; Codex also needs GNU fold's -b option.
-            packages='bash ca-certificates curl git tar gzip findutils procps-ng coreutils'
+            packages='bash ca-certificates curl git tar gzip findutils procps-ng coreutils python3'
             [ "$java" = none ] || packages="$packages fontconfig ttf-dejavu libgcc libstdc++ tzdata zlib binutils"
             [ "$php" = false ] || packages="$packages php-cli"
             [ "$go" = false ] || packages="$packages go"
@@ -183,7 +184,7 @@ main() (
             [ "$claude" = false ] || packages="$packages libgcc libstdc++"
             { [ "$codex" = false ] && [ "$gradle" = false ]; } || packages="$packages gawk"
             [ "$build_tools" = false ] || packages="$packages build-base"
-            [ "$docker" = false ] || packages="$packages docker-cli docker-cli-compose"
+            packages="$packages docker-cli docker-cli-compose"
             ;;
         *) fail "Invalid OS: $os" ;;
     esac
@@ -211,7 +212,7 @@ main() (
         printf 'FROM %s:%s\n\n' "$image" "$tag"
         if [ "$os" = ubuntu ]; then
             printf 'RUN apt-get update \\\n'
-            if [ "$docker" = true ] && [ "$tag" = 22.04 ]; then
+            if [ "$tag" = 22.04 ]; then
                 printf '    && if apt-cache show docker-compose-v2 >/dev/null 2>&1; then \\\n'
                 printf '         compose_package=docker-compose-v2; \\\n'
                 printf '       else compose_package=docker-compose; fi \\\n'
@@ -295,19 +296,18 @@ EOF
         printf '\nWORKDIR /workspaces\nCMD ["sleep", "infinity"]\n'
     } > "$output/Dockerfile"
 
-    {
-        cat <<'EOF'
+    cat <<'EOF' > "$output/devcontainer.json"
 {
   "name": "Development container for ${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "shutdownAction": "stopContainer"
+}
 EOF
-        if [ "$docker" = true ]; then
-            printf '  "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],\n'
-        fi
-        printf '  "shutdownAction": "stopContainer"\n}\n'
-    } > "$output/devcontainer.json"
 
     printf 'Generated %s/Dockerfile and %s/devcontainer.json\n' "$output" "$output"
 )

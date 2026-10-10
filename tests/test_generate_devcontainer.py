@@ -47,7 +47,7 @@ BUILD_PACKAGES = {
     "alpine": {"build-base"},
 }
 MARIADB_PACKAGES = {"ubuntu": "mariadb-client", "fedora": "mariadb", "alpine": "mariadb-client"}
-EXTRAS = ("docker", "build-tools", "jq", "unzip", "mariadb")
+EXTRAS = ("build-tools", "jq", "unzip", "mariadb")
 
 
 @unittest.skipUnless(BASH, "Bash is required")
@@ -100,6 +100,9 @@ class GenerateDevcontainerTests(unittest.TestCase):
             "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
         )
         self.assertEqual(config["shutdownAction"], "stopContainer")
+        self.assertEqual(config["mounts"], [
+            "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+        ])
         self.assertIn("WORKDIR /workspaces\n", dockerfile)
         self.assertIn('CMD ["sleep", "infinity"]\n', dockerfile)
         self.assertIn("git config --system --add safe.directory '/workspaces/*'", dockerfile)
@@ -131,10 +134,14 @@ class GenerateDevcontainerTests(unittest.TestCase):
         image = {"ubuntu": "ubuntu", "fedora": "quay.io/fedora/fedora", "alpine": "alpine"}[os_name]
         self.assertTrue(dockerfile.startswith(f"FROM {image}:{tag}\n"))
         packages = self.installed_packages(dockerfile)
-        base = {"bash", "ca-certificates", "curl", "git", "tar", "gzip", "findutils"}
+        base = {"bash", "ca-certificates", "curl", "git", "tar", "gzip", "findutils", "python3"}
         base.add("procps" if os_name == "ubuntu" else "procps-ng")
         if os_name == "alpine":
             base.add("coreutils")
+        base.update(DOCKER_PACKAGES[os_name])
+        if os_name == "ubuntu" and tag == "22.04":
+            base.remove("docker-compose-v2")
+            self.assertIn('"$compose_package"', dockerfile)
         self.assertTrue(base <= packages, packages)
         if os_name == "ubuntu":
             self.assertIn("apt-get update", dockerfile)
@@ -159,8 +166,6 @@ class GenerateDevcontainerTests(unittest.TestCase):
         dockerfile, config = self.read_output()
         base = self.assert_base(dockerfile, "ubuntu", "26.04")
         self.assertEqual(self.installed_packages(dockerfile), base)
-        self.assertNotIn("mounts", config)
-        self.assertNotIn("docker.sock", json.dumps(config))
 
     def test_default_versions_are_conditional_and_argument_order_independent(self):
         cases = [
@@ -180,7 +185,6 @@ class GenerateDevcontainerTests(unittest.TestCase):
                 dockerfile, config = self.read_output(output)
                 base = self.assert_base(dockerfile, os_name, tag)
                 self.assertEqual(self.installed_packages(dockerfile), base)
-                self.assertNotIn("mounts", config)
 
     def assert_java(self, dockerfile, version, os_name="ubuntu"):
         suffix = "-alpine" if os_name == "alpine" else ""
@@ -263,7 +267,6 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             expected.add(AWK_PACKAGES[os_name])
                         self.assert_java_build_tools(dockerfile, "maven" in selected, "gradle" in selected)
                         self.assertEqual(self.installed_packages(dockerfile), expected)
-                        self.assertNotIn("mounts", config)
 
     def test_java_modes_with_jdk_dependents_for_every_release(self):
         number = 0
@@ -414,7 +417,6 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             self.assertNotIn("npm", dockerfile)
                             self.assertNotIn("ANTHROPIC_API_KEY", dockerfile)
                             self.assertNotIn("OPENAI_API_KEY", dockerfile)
-                            self.assertNotIn("mounts", config)
 
     def test_ai_flags_can_be_repeated_without_duplicate_installers(self):
         self.assert_success(self.run_generator("--claude", "--codex", "--claude", "--codex"))
@@ -436,18 +438,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
                         dockerfile, os_name, DEFAULT_TAGS[os_name],
                     )
                     if enabled[0]:
-                        expected.update(DOCKER_PACKAGES[os_name])
-                        self.assertEqual(config["mounts"], [
-                            "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-                        ])
-                    else:
-                        self.assertNotIn("mounts", config)
-                        self.assertNotIn("docker.sock", json.dumps(config))
-                    if enabled[1]:
                         expected.update(BUILD_PACKAGES[os_name])
                     expected.update(
                         MARIADB_PACKAGES[os_name] if name == "mariadb" else name
-                        for name, value in zip(EXTRAS[2:], enabled[2:]) if value
+                        for name, value in zip(EXTRAS[1:], enabled[1:]) if value
                     )
                     self.assertEqual(self.installed_packages(dockerfile), expected)
 
@@ -466,19 +460,19 @@ class GenerateDevcontainerTests(unittest.TestCase):
                     self.assertEqual(self.installed_packages(dockerfile), expected)
                     self.assertEqual(shlex.split(dockerfile).count(MARIADB_PACKAGES[os_name]), 1)
                     self.assertNotIn("mariadb-server", dockerfile)
-                    self.assertNotIn("mounts", config)
 
-    def test_docker_for_every_release_including_jammy_compose_fallback(self):
+    def test_default_docker_for_every_release_including_jammy_compose_fallback(self):
         for os_name, releases in RELEASES.items():
             for version, tag in releases.items():
                 with self.subTest(os=os_name, version=version):
                     output = f"docker-{os_name}-{version}"
                     self.assert_success(self.run_generator(
-                        "--os", os_name, "--version", version, "--docker", "--output", output,
+                        "--os", os_name, "--version", version, "--output", output,
                     ))
                     dockerfile, config = self.read_output(output)
                     self.assert_base(dockerfile, os_name, tag)
                     self.assertIn("docker.sock", config["mounts"][0])
+
                     if os_name == "ubuntu" and tag == "22.04":
                         self.assertIn("apt-cache show docker-compose-v2", dockerfile)
                         self.assertIn("compose_package=docker-compose-v2", dockerfile)
@@ -492,7 +486,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
     def test_invalid_arguments_do_not_write(self):
         cases = [
             ["--unknown"], ["ubuntu"], ["--"], ["--os=ubuntu"], ["--java=true"],
-            ["--vim"], ["--tmux"],
+            ["--vim"], ["--tmux"], ["--docker"],
             ["--os"], ["--version"], ["--output"],
             ["--os", ""], ["--version", ""], ["--output", ""],
             ["--os", "--java"], ["--version", "--go"], ["--output", "--force"],
@@ -649,7 +643,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                 output = f"piped output {os_name}"
                 result = self.run_generator(
                     "--os", os_name, "--version", "latest", "--mvn", "--gradle",
-                    "--java-latest", "--php", "--go", "--docker", "--output", output, piped=True,
+                    "--java-latest", "--php", "--go", "--output", output, piped=True,
                 )
                 self.assert_success(result)
                 dockerfile, config = self.read_output(output)

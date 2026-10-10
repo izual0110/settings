@@ -104,20 +104,20 @@
             <section class="panel">
               <fieldset>
                 <legend><span class="step">03</span> Tools</legend>
-                <p class="section-note">Bash, Git, curl, CA certificates, tar, gzip, find, and ps are already included.</p>
+                <p class="section-note">Bash, Git, curl, CA certificates, tar, gzip, find, ps, Python 3, Docker, and Compose are already included.</p>
                 <div class="tools-grid">
                   <label class="choice tool-choice"><input type="checkbox" data-flag="build-tools"><span><strong>Build tools</strong><small>C / C++ · make</small></span></label>
                   <label class="choice tool-choice"><input type="checkbox" data-flag="jq"><span><strong>jq</strong><small>JSON processing</small></span></label>
 
                   <label class="choice tool-choice"><input type="checkbox" data-flag="unzip"><span><strong>unzip</strong><small>ZIP archives</small></span></label>
                   <label class="choice tool-choice"><input type="checkbox" data-flag="mariadb"><span><strong>MariaDB client</strong><small>SQL CLI · no server</small></span></label>
-                  <label class="choice tool-choice"><input id="docker" type="checkbox" data-flag="docker" aria-describedby="docker-note"><span><strong>Docker + Compose</strong><small>Host Docker from the container</small></span></label>
+
                   <label class="choice tool-choice"><input type="checkbox" data-flag="claude" aria-describedby="ai-note"><span><strong>Claude Code</strong><small>CLI · Anthropic</small></span></label>
                   <label class="choice tool-choice"><input type="checkbox" data-flag="codex" aria-describedby="ai-note"><span><strong>Codex</strong><small>CLI · OpenAI</small></span></label>
                 </div>
                 <p id="ai-note" class="section-note footnote">Claude Code and Codex are installed only inside the container. Authentication is required after startup; service usage depends on your plan. Host keys and settings are not copied.</p>
-                <p id="docker-note" class="section-note footnote">Docker mounts <code>/var/run/docker.sock</code>. Socket access lets the container control the host's Docker daemon; enable it only for trusted projects.</p>
-                <p id="docker-warning" class="notice warning" hidden>The Docker socket will be mounted inside the container. On Linux, this may grant root-level access to the host. Ubuntu 22.04 may fall back to Compose v1.</p>
+                <p id="docker-note" class="section-note footnote">Docker and Compose CLI tools are installed by default, and the host Docker socket is always mounted. Ubuntu 22.04 may fall back to Compose v1.</p>
+                <p id="docker-warning" class="notice warning">The host socket <code>/var/run/docker.sock</code> is always mounted. This lets the container control the host's Docker daemon and may grant root-level access on Linux. Use only for trusted projects.</p>
               </fieldset>
             </section>
             <button id="reset" class="text-button" type="button">Reset selection ↺</button>
