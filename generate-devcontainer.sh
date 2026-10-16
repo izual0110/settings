@@ -279,6 +279,7 @@ EOF
 
 RUN curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh \
     && bash /tmp/claude-install.sh latest \
+    && install -m 0755 /root/.local/bin/claude /usr/local/bin/claude \
     && rm -f /tmp/claude-install.sh \
     && claude --version
 EOF

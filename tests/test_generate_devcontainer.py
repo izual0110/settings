@@ -424,6 +424,56 @@ class GenerateDevcontainerTests(unittest.TestCase):
         self.assertEqual(dockerfile.count("https://claude.ai/install.sh"), 1)
         self.assertEqual(dockerfile.count("https://chatgpt.com/codex/install.sh"), 1)
 
+    def test_claude_runs_without_installer_home_in_path(self):
+        for os_name in RELEASES:
+            with self.subTest(os=os_name):
+                output = self.root / os_name
+                self.assert_success(self.run_generator(
+                    "--os", os_name, "--claude", "--output", str(output),
+                ))
+                dockerfile = (output / "Dockerfile").read_text()
+                command = next(
+                    line.removeprefix("RUN ")
+                    for line in dockerfile.replace("\\\n", " ").splitlines()
+                    if line.startswith("RUN curl") and "claude-install.sh" in line
+                )
+                home = output / "installer-home"
+                local_bin = home / ".local/bin"
+                local_bin.mkdir(parents=True)
+                payload = home / "claude-version"
+                payload.write_text("#!/bin/sh\nprintf 'mock-claude 1.0\\n'\n")
+                payload.chmod(0o755)
+                (local_bin / "claude").symlink_to(payload)
+                system_bin = output / "system-bin"
+                system_bin.mkdir()
+                mock_bin = output / "mock-bin"
+                mock_bin.mkdir()
+                # Stand in for the download/installer, leaving a native-installer
+                # style symlink. Execute the generated install commands unchanged
+                # apart from sandboxing their absolute destinations.
+                curl = mock_bin / "curl"
+                curl.write_text('#!/bin/sh\nprintf \'exit 0\\n\' > "$3"\n')
+                curl.chmod(0o755)
+                for original, replacement in (
+                    ("/root/.local/bin/claude", local_bin / "claude"),
+                    ("/usr/local/bin/claude", system_bin / "claude"),
+                    ("/tmp/claude-install.sh", output / "installer.sh"),
+                ):
+                    command = command.replace(original, shlex.quote(str(replacement)))
+                self.assert_success(subprocess.run(
+                    [BASH, "--noprofile", "--norc", "-c", command],
+                    env={"PATH": f"{mock_bin}:{local_bin}:{os.defpath}"},
+                    capture_output=True, text=True, timeout=10,
+                ))
+                shutil.rmtree(home)
+                result = subprocess.run(
+                    [BASH, "--noprofile", "--norc", "-c", "claude --version"],
+                    env={"PATH": str(system_bin)},
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assert_success(result)
+                self.assertEqual(result.stdout, "mock-claude 1.0\n")
+
     def test_all_extra_toggle_combinations_for_each_distro(self):
         for os_name in RELEASES:
             for number, enabled in enumerate(itertools.product((False, True), repeat=len(EXTRAS))):
