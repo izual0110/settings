@@ -18,6 +18,8 @@ Use `--help` for all options or `--force` to replace existing generated files.
 
 Python 3 is installed by default from the distribution's repositories on Ubuntu, Fedora, and Alpine; no flag is required.
 
+With `--claude`, the Claude Code executable is also copied to `/usr/local/bin/claude` so it remains available when a login shell resets `PATH` or the container uses a different user. Regenerate the Dockerfile and rebuild the container to apply this to an existing setup.
+
 Docker/Compose tools are always installed and the host Docker socket (`/var/run/docker.sock`) is always mounted. The host must provide this socket. **Warning:** socket access lets the container control the host's Docker daemon and may grant root-level access on Linux; use only for trusted projects.
 
 Alpine defaults to `3.24` (`--version current`); `--version latest` follows the publisher's floating tag. Java uses musl-compatible Temurin images on Alpine.
