@@ -288,7 +288,7 @@ EOF
             cat <<'EOF'
 
 RUN curl -fsSL -o /tmp/codex-install.sh https://chatgpt.com/codex/install.sh \
-    && CODEX_NON_INTERACTIVE=true sh /tmp/codex-install.sh \
+    && CODEX_INSTALL_DIR=/usr/local/bin CODEX_HOME=/usr/local/lib/codex CODEX_NON_INTERACTIVE=true sh /tmp/codex-install.sh \
     && rm -f /tmp/codex-install.sh \
     && codex --version
 EOF

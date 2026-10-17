@@ -408,7 +408,8 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             if codex:
                                 expected.add(AWK_PACKAGES[os_name])
                                 self.assertIn("https://chatgpt.com/codex/install.sh", dockerfile)
-                                self.assertIn("&& CODEX_NON_INTERACTIVE=true sh /tmp/codex-install.sh", dockerfile)
+                                self.assertIn("&& CODEX_INSTALL_DIR=/usr/local/bin CODEX_HOME=/usr/local/lib/codex CODEX_NON_INTERACTIVE=true sh /tmp/codex-install.sh", dockerfile)
+                                self.assertNotIn("ENV CODEX_HOME", dockerfile)
                                 self.assertIn("&& rm -f /tmp/codex-install.sh", dockerfile)
                                 self.assertIn("&& codex --version", dockerfile)
                             else:
@@ -473,6 +474,63 @@ class GenerateDevcontainerTests(unittest.TestCase):
                 )
                 self.assert_success(result)
                 self.assertEqual(result.stdout, "mock-claude 1.0\n")
+
+    def test_codex_runs_without_installer_home_in_path(self):
+        for os_name in RELEASES:
+            with self.subTest(os=os_name):
+                output = self.root / os_name
+                self.assert_success(self.run_generator(
+                    "--os", os_name, "--codex", "--output", str(output),
+                ))
+                dockerfile = (output / "Dockerfile").read_text()
+                command = next(
+                    line.removeprefix("RUN ")
+                    for line in dockerfile.replace("\\\n", " ").splitlines()
+                    if line.startswith("RUN curl") and "codex-install.sh" in line
+                )
+                home = output / "installer-home"
+                home.mkdir()
+                system_bin = output / "system-bin"
+                system_bin.mkdir()
+                package_home = output / "system-lib/codex"
+                mock_bin = output / "mock-bin"
+                mock_bin.mkdir()
+                # Model the installer's package and visible symlink, including a
+                # resource needed at runtime rather than just a standalone binary.
+                installer = output / "mock-installer.sh"
+                installer.write_text(
+                    'set -eu\n'
+                    '[ "$CODEX_NON_INTERACTIVE" = true ]\n'
+                    'release="$CODEX_HOME/packages/standalone/releases/mock"\n'
+                    'mkdir -p "$release/bin" "$release/codex-resources" "$CODEX_INSTALL_DIR"\n'
+                    'printf "mock-codex 1.0\\n" > "$release/codex-resources/version"\n'
+                    'printf \'#!/bin/sh\\nread -r version < "%s/codex-resources/version"\\nprintf "%%s\\\\n" "$version"\\n\' "$release" > "$release/bin/codex"\n'
+                    'chmod 0755 "$release/bin/codex"\n'
+                    'ln -s "$release" "$CODEX_HOME/packages/standalone/current"\n'
+                    'ln -s "$CODEX_HOME/packages/standalone/current/bin/codex" "$CODEX_INSTALL_DIR/codex"\n'
+                )
+                curl = mock_bin / "curl"
+                curl.write_text(f'#!/bin/sh\ncp {shlex.quote(str(installer))} "$3"\n')
+                curl.chmod(0o755)
+                for original, replacement in (
+                    ("/usr/local/bin", system_bin),
+                    ("/usr/local/lib/codex", package_home),
+                    ("/tmp/codex-install.sh", output / "installer.sh"),
+                ):
+                    command = command.replace(original, shlex.quote(str(replacement)))
+                self.assert_success(subprocess.run(
+                    [BASH, "--noprofile", "--norc", "-c", command],
+                    env={"HOME": str(home), "PATH": f"{mock_bin}:{system_bin}:{os.defpath}"},
+                    capture_output=True, text=True, timeout=10,
+                ))
+                shutil.rmtree(home)
+                result = subprocess.run(
+                    [BASH, "--noprofile", "--norc", "-c", "codex --version"],
+                    env={"PATH": str(system_bin)},
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assert_success(result)
+                self.assertEqual(result.stdout, "mock-codex 1.0\n")
 
     def test_all_extra_toggle_combinations_for_each_distro(self):
         for os_name in RELEASES:
