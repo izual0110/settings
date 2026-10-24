@@ -81,7 +81,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
     def assert_success(self, result):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def read_output(self, output=".devcontainer"):
+    def read_output(self, output=".devcontainer", docker_socket=False):
         directory = self.root / output
         self.assertEqual(
             {entry.name for entry in directory.iterdir()},
@@ -91,7 +91,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
         config = json.loads((directory / "devcontainer.json").read_text())
         self.assertEqual(
             config["name"],
-            "Development container for ${localWorkspaceFolderBasename}",
+            "${localWorkspaceFolderBasename}",
         )
         self.assertEqual(config["build"], {"dockerfile": "Dockerfile"})
         self.assertEqual(config["workspaceFolder"], "/workspaces/${localWorkspaceFolderBasename}")
@@ -100,9 +100,12 @@ class GenerateDevcontainerTests(unittest.TestCase):
             "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
         )
         self.assertEqual(config["shutdownAction"], "stopContainer")
-        self.assertEqual(config["mounts"], [
-            "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-        ])
+        if docker_socket:
+            self.assertEqual(config["mounts"], [
+                "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+            ])
+        else:
+            self.assertNotIn("mounts", config)
         self.assertIn("WORKDIR /workspaces\n", dockerfile)
         self.assertIn('CMD ["sleep", "infinity"]\n', dockerfile)
         self.assertIn("git config --system --add safe.directory '/workspaces/*'", dockerfile)
@@ -336,9 +339,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             self.assertEqual(self.installed_packages(dockerfile), expected)
                             self.assert_java(dockerfile, "27" if java == "--java-latest" else "25", os_name)
                             self.assert_java_build_tools(dockerfile, True, True)
-                            self.assertEqual(config["mounts"], [
-                                "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-                            ])
+                            self.assertNotIn("mounts", config)
                             self.assertIn("&& clojure -Sdescribe", dockerfile)
                             self.assertIn("&& claude --version", dockerfile)
                             self.assertIn("&& codex --version", dockerfile)
@@ -579,7 +580,7 @@ class GenerateDevcontainerTests(unittest.TestCase):
                     ))
                     dockerfile, config = self.read_output(output)
                     self.assert_base(dockerfile, os_name, tag)
-                    self.assertIn("docker.sock", config["mounts"][0])
+                    self.assertNotIn("mounts", config)
 
                     if os_name == "ubuntu" and tag == "22.04":
                         self.assertIn("apt-cache show docker-compose-v2", dockerfile)
@@ -590,6 +591,13 @@ class GenerateDevcontainerTests(unittest.TestCase):
                         self.assertIn("docker-compose-v2", self.installed_packages(dockerfile))
                     else:
                         self.assertTrue(DOCKER_PACKAGES[os_name] <= self.installed_packages(dockerfile))
+
+    def test_docker_socket_is_explicit_and_warns(self):
+        for os_name in RELEASES:
+            result = self.run_generator("--os", os_name, "--docker-socket", "--output", os_name)
+            self.assert_success(result)
+            self.read_output(os_name, docker_socket=True)
+            self.assertIn("dangerous", result.stderr)
 
     def test_invalid_arguments_do_not_write(self):
         cases = [

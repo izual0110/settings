@@ -23,6 +23,7 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --claude                Install Claude Code CLI
   --codex                 Install OpenAI Codex CLI
 
+  --docker-socket         Mount host Docker socket (dangerous: host daemon access)
   --build-tools           Install the distribution's compiler/build tools
   --jq                    Install jq
   --unzip                 Install unzip
@@ -35,7 +36,7 @@ Clojure, Maven, and Gradle add Java LTS unless a Java version is selected.
 Java LTS and latest are mutually exclusive.
 
 Python 3 and Docker/Compose are installed by default.
-The host Docker socket (/var/run/docker.sock) is always mounted.
+The host Docker socket is mounted only with --docker-socket (dangerous).
 WARNING: socket access grants control of the host daemon; use only for trusted projects.
 
 No packages are installed on the host. Builds use distribution repos,
@@ -78,6 +79,7 @@ main() (
     claude=false
     codex=false
 
+    docker_socket=false
     build_tools=false
     jq=false
     unzip=false
@@ -114,6 +116,7 @@ main() (
             --claude) claude=true; shift ;;
             --codex) codex=true; shift ;;
 
+            --docker-socket) docker_socket=true; shift ;;
             --build-tools) build_tools=true; shift ;;
             --jq) jq=true; shift ;;
             --unzip) unzip=true; shift ;;
@@ -303,9 +306,16 @@ EOF
   "build": { "dockerfile": "Dockerfile" },
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind",
+EOF
+    if [ "$docker_socket" = true ]; then
+        cat <<'EOF' >> "$output/devcontainer.json"
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
+EOF
+        printf 'WARNING: --docker-socket is dangerous: container access to the host Docker daemon may grant root-level access.\n' >&2
+    fi
+    cat <<'EOF' >> "$output/devcontainer.json"
   "shutdownAction": "stopContainer"
 }
 EOF

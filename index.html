@@ -116,8 +116,9 @@
                   <label class="choice tool-choice"><input type="checkbox" data-flag="codex" aria-describedby="ai-note"><span><strong>Codex</strong><small>CLI · OpenAI</small></span></label>
                 </div>
                 <p id="ai-note" class="section-note footnote">Claude Code and Codex are installed only inside the container. Authentication is required after startup; service usage depends on your plan. Host keys and settings are not copied.</p>
-                <p id="docker-note" class="section-note footnote">Docker and Compose CLI tools are installed by default, and the host Docker socket is always mounted. Ubuntu 22.04 may fall back to Compose v1.</p>
-                <p id="docker-warning" class="notice warning">The host socket <code>/var/run/docker.sock</code> is always mounted. This lets the container control the host's Docker daemon and may grant root-level access on Linux. Use only for trusted projects.</p>
+                <label class="choice tool-choice"><input id="docker-socket" type="checkbox" data-flag="docker-socket" aria-describedby="docker-warning"><span><strong>Docker socket — dangerous</strong><small>Forward the host Docker socket · disabled by default</small></span></label>
+                <p id="docker-note" class="section-note footnote">Docker and Compose CLI tools are installed by default; the host Docker socket is mounted only when selected. Ubuntu 22.04 may fall back to Compose v1.</p>
+                <p id="docker-warning" class="notice warning"><strong>Dangerous:</strong> enabling Docker socket forwarding mounts <code>/var/run/docker.sock</code>. This lets the container control the host's Docker daemon and may grant root-level access on Linux. Use only for trusted projects.</p>
               </fieldset>
             </section>
             <button id="reset" class="text-button" type="button">Reset selection ↺</button>
