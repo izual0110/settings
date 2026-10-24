@@ -20,7 +20,7 @@ Python 3 is installed by default from the distribution's repositories on Ubuntu,
 
 With `--claude`, the Claude Code executable is also copied to `/usr/local/bin/claude`. With `--codex`, Codex is installed to `/usr/local/lib/codex`, including its bundled resources, with its command in `/usr/local/bin`. Both CLIs remain available when a login shell resets `PATH` or the container uses a different user. Codex's `CODEX_HOME` override applies only during installation; runtime settings and authentication still use the current user's home. Regenerate the Dockerfile and rebuild the container to apply this to an existing setup.
 
-Docker/Compose tools are always installed and the host Docker socket (`/var/run/docker.sock`) is always mounted. The host must provide this socket. **Warning:** socket access lets the container control the host's Docker daemon and may grant root-level access on Linux; use only for trusted projects.
+Docker/Compose tools are always installed and the host Docker socket is **not mounted by default**. Enable the **Docker socket — dangerous** checkbox or pass `--docker-socket` to mount `/var/run/docker.sock`; the host must provide this socket. **Dangerous:** socket access lets the container control the host's Docker daemon and may grant root-level access on Linux; use only for trusted projects.
 
 Alpine defaults to `3.24` (`--version current`); `--version latest` follows the publisher's floating tag. Java uses musl-compatible Temurin images on Alpine.
 

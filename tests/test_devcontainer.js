@@ -188,6 +188,20 @@ function assertJavaControls(page, enabled) {
   }
 }
 
+test("Docker socket forwarding is opt-in and resets", () => {
+  const page = loadPage("stub");
+  assert.equal(page.flag("docker-socket").checked, false);
+  assert.doesNotMatch(page.byId("command").value, /--docker-socket/);
+  page.check("docker-socket", true);
+  assert.match(page.byId("command").value, /--docker-socket/);
+  page.check("docker-socket", false);
+  assert.doesNotMatch(page.byId("command").value, /--docker-socket/);
+  page.check("docker-socket", true);
+  page.reset();
+  assert.equal(page.flag("docker-socket").checked, false);
+  assert.doesNotMatch(page.byId("command").value, /--docker-socket/);
+});
+
 for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : [])]) {
   test(`${backend}: initial defaults and Alpine commands/images`, () => {
     const page = loadPage(backend);

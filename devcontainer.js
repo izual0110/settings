@@ -41,6 +41,7 @@ const FLAG_LABELS = {
   clojure: "Clojure CLI 1.12.6.1673", php: "PHP", go: "Go", "build-tools": "Build tools",
   jq: "jq", unzip: "unzip", mariadb: "MariaDB client",
   claude: "Claude Code", codex: "Codex",
+  "docker-socket": "Docker socket (dangerous)",
   force: "overwrite files",
 };
 
