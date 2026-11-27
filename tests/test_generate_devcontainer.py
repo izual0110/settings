@@ -24,11 +24,14 @@ RELEASES = {
     "fedora": {"current": "44", "latest": "latest", "44": "44"},
     "alpine": {"current": "3.24", "latest": "latest", "3.24": "3.24"},
 }
-LANGUAGES = {
-    "ubuntu": {"php": "php-cli", "go": "golang-go"},
-    "fedora": {"php": "php-cli", "go": "golang"},
-    "alpine": {"php": "php-cli", "go": "go"},
+PHP_PACKAGES = {
+    "ubuntu": {"php-cli", "php-mbstring"},
+    "fedora": {"php-cli", "php-mbstring", "php-process"},
+    "alpine": {
+        "php-cli", "php-ctype", "php-iconv", "php-mbstring", "php-openssl", "php-phar", "php-posix", "php-tokenizer",
+    },
 }
+GO_PACKAGES = {"ubuntu": "golang-go", "fedora": "golang", "alpine": "go"}
 JAVA_PACKAGES = {
     "ubuntu": {"fontconfig", "libstdc++6", "tzdata", "zlib1g", "binutils"},
     "fedora": {"fontconfig", "libstdc++", "tzdata", "zlib", "binutils"},
@@ -244,10 +247,21 @@ class GenerateDevcontainerTests(unittest.TestCase):
                         ))
                         dockerfile, config = self.read_output(output)
                         expected = self.assert_base(dockerfile, os_name, tag)
-                        expected.update(
-                            LANGUAGES[os_name][name]
-                            for name in ("php", "go") if name in selected
-                        )
+                        if "php" in selected:
+                            expected.update(PHP_PACKAGES[os_name])
+                            phpactor_version = "2025.12.21.1" if os_name == "ubuntu" and tag == "22.04" else "2026.11.22.0"
+                            self.assertIn(f"ARG PHPACTOR_VERSION={phpactor_version}\n", dockerfile)
+                            self.assertIn("RUN curl -fsSL -o /usr/local/bin/phpactor", dockerfile)
+                            self.assertIn(
+                                "https://github.com/phpactor/phpactor/releases/download/"
+                                "${PHPACTOR_VERSION}/phpactor.phar", dockerfile,
+                            )
+                            self.assertIn("&& chmod 0755 /usr/local/bin/phpactor", dockerfile)
+                            self.assertIn("&& phpactor --version", dockerfile)
+                        else:
+                            self.assertNotIn("phpactor", dockerfile)
+                        if "go" in selected:
+                            expected.add(GO_PACKAGES[os_name])
                         if selected & {"java", "clojure", "maven", "gradle"}:
                             expected.update(JAVA_PACKAGES[os_name])
                             self.assert_java(dockerfile, "25", os_name)
@@ -329,10 +343,10 @@ class GenerateDevcontainerTests(unittest.TestCase):
                             ))
                             dockerfile, config = self.read_output(output)
                             expected = self.assert_base(dockerfile, os_name, tag)
-                            expected.update(JAVA_PACKAGES[os_name], LANGUAGES[os_name].values(),
+                            expected.update(JAVA_PACKAGES[os_name], PHP_PACKAGES[os_name],
                                             DOCKER_PACKAGES[os_name], BUILD_PACKAGES[os_name],
                                             {"rlwrap", "jq", "unzip", AWK_PACKAGES[os_name],
-                                             MARIADB_PACKAGES[os_name]})
+                                             GO_PACKAGES[os_name], MARIADB_PACKAGES[os_name]})
                             if os_name == "ubuntu" and tag == "22.04":
                                 expected.remove("docker-compose-v2")
                                 self.assertIn('"$compose_package"', dockerfile)
@@ -767,7 +781,8 @@ class GenerateDevcontainerTests(unittest.TestCase):
                 self.assert_java(dockerfile, "27", os_name)
                 self.assert_java_build_tools(dockerfile, True, True)
                 self.assertIn("${localWorkspaceFolder}", config["workspaceMount"])
-                self.assertTrue(set(LANGUAGES[os_name].values()) <= self.installed_packages(dockerfile))
+                self.assertTrue(PHP_PACKAGES[os_name] | {GO_PACKAGES[os_name]} <= self.installed_packages(dockerfile))
+                self.assertIn("&& phpactor --version", dockerfile)
 
     def test_downloaded_prefix_has_no_side_effects(self):
         source = SCRIPT.read_text().rsplit('main "$@"', 1)[0]

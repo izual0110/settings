@@ -291,6 +291,8 @@ for (const backend of ["stub", ...(process.env.DEVCONTAINER_JSDOM ? ["jsdom"] : 
     page.radio("version", "latest");
     page.radio("java-version", "java-latest");
     for (const name of ["maven", "gradle", "clojure", "php", "go", "force"]) page.check(name, true);
+    assert.match(page.byId("command").value, / --php /);
+    assert.match(page.byId("summary").textContent, /PHP \+ Phpactor/);
     assert.equal(page.byId("docker-warning").hidden, false);
     assert.ok(page.byId("command").value.endsWith(" --force"));
     page.check("java", false);
