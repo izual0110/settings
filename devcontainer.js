@@ -38,7 +38,7 @@ const DISTRIBUTIONS = {
 const FLAG_LABELS = {
   java: "Java 25 LTS", "java-lts": "Java 25 LTS", "java-latest": "Java 27 (latest)",
   maven: "Maven", gradle: "Gradle",
-  clojure: "Clojure CLI 1.12.6.1673", php: "PHP", go: "Go", "build-tools": "Build tools",
+  clojure: "Clojure CLI 1.12.6.1673", php: "PHP + Phpactor", go: "Go", "build-tools": "Build tools",
   jq: "jq", unzip: "unzip", mariadb: "MariaDB client",
   claude: "Claude Code", codex: "Codex",
   "docker-socket": "Docker socket (dangerous)",

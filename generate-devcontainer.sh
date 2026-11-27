@@ -18,7 +18,7 @@ Generate Dockerfile and devcontainer.json in --output (default: .devcontainer).
   --clojure               Install Clojure CLI
   --maven                 Install Maven 3 (alias: --mvn)
   --gradle                Install Gradle 9
-  --php                   Install the distribution's PHP CLI
+  --php                   Install the distribution's PHP CLI and Phpactor
   --go                    Install the distribution's Go toolchain
   --claude                Install Claude Code CLI
   --codex                 Install OpenAI Codex CLI
@@ -40,8 +40,8 @@ The host Docker socket is mounted only with --docker-socket (dangerous).
 WARNING: socket access grants control of the host daemon; use only for trusted projects.
 
 No packages are installed on the host. Builds use distribution repos,
-Temurin / Maven / Gradle images from Docker Hub, GitHub for Clojure CLI,
-and official Claude Code / Codex download services for the selected AI tools.
+Temurin / Maven / Gradle images from Docker Hub, GitHub releases for Clojure CLI
+and Phpactor, and official Claude Code / Codex download services for the selected AI tools.
 Ubuntu 22.04 uses docker-compose if docker-compose-v2 is unavailable.
 EOF
 }
@@ -142,7 +142,7 @@ main() (
             image=ubuntu
             packages='bash ca-certificates curl git tar gzip findutils procps python3'
             [ "$java" = none ] || packages="$packages fontconfig libstdc++6 tzdata zlib1g binutils"
-            [ "$php" = false ] || packages="$packages php-cli"
+            [ "$php" = false ] || packages="$packages php-cli php-mbstring"
             [ "$go" = false ] || packages="$packages golang-go"
             [ "$mariadb" = false ] || packages="$packages mariadb-client"
             [ "$claude" = false ] || packages="$packages libstdc++6"
@@ -162,7 +162,7 @@ main() (
             image=quay.io/fedora/fedora
             packages='bash ca-certificates curl git tar gzip findutils procps-ng python3'
             [ "$java" = none ] || packages="$packages fontconfig libstdc++ tzdata zlib binutils"
-            [ "$php" = false ] || packages="$packages php-cli"
+            [ "$php" = false ] || packages="$packages php-cli php-mbstring php-process"
             [ "$go" = false ] || packages="$packages golang"
             [ "$mariadb" = false ] || packages="$packages mariadb"
             [ "$claude" = false ] || packages="$packages libstdc++"
@@ -181,7 +181,7 @@ main() (
             # GNU sleep supports infinity; Codex also needs GNU fold's -b option.
             packages='bash ca-certificates curl git tar gzip findutils procps-ng coreutils python3'
             [ "$java" = none ] || packages="$packages fontconfig ttf-dejavu libgcc libstdc++ tzdata zlib binutils"
-            [ "$php" = false ] || packages="$packages php-cli"
+            [ "$php" = false ] || packages="$packages php-cli php-ctype php-iconv php-mbstring php-openssl php-phar php-posix php-tokenizer"
             [ "$go" = false ] || packages="$packages go"
             [ "$mariadb" = false ] || packages="$packages mariadb-client"
             [ "$claude" = false ] || packages="$packages libgcc libstdc++"
@@ -269,6 +269,20 @@ RUN curl -fsSL -o /tmp/linux-install.sh \
     && bash linux-install.sh \
     && rm -f linux-install.sh \
     && clojure -Sdescribe
+EOF
+        fi
+        if [ "$php" = true ]; then
+            phpactor_version=2026.11.22.0
+            # Ubuntu 22.04 ships PHP 8.1. Newer Phpactor releases require PHP 8.2.
+            if [ "$os" = ubuntu ] && [ "$tag" = 22.04 ]; then
+                phpactor_version=2025.12.21.1
+            fi
+            printf '\nARG PHPACTOR_VERSION=%s\n' "$phpactor_version"
+            cat <<'EOF'
+RUN curl -fsSL -o /usr/local/bin/phpactor \
+      "https://github.com/phpactor/phpactor/releases/download/${PHPACTOR_VERSION}/phpactor.phar" \
+    && chmod 0755 /usr/local/bin/phpactor \
+    && phpactor --version
 EOF
         fi
         if [ "$claude" = true ] || [ "$codex" = true ]; then
